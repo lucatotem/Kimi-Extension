@@ -1,0 +1,81 @@
+{
+  "name": "kimi-copilot-presets",
+  "displayName": "Kimi Copilot Presets",
+  "description": "Adds Kimi/Moonshot chat models to VS Code Chat with automatic model discovery.",
+  "version": "0.0.1",
+  "publisher": "kimi-copilot-presets",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/kimi-copilot-presets"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Chat"
+  ],
+  "activationEvents": [
+    "onLanguageModelChatProvider:kimi",
+    "onCommand:kimiCopilot.manage",
+    "onCommand:kimiCopilot.setApiKey",
+    "onCommand:kimiCopilot.refreshModels"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languageModelChatProviders": [
+      {
+        "vendor": "kimi",
+        "displayName": "Kimi",
+        "managementCommand": "kimiCopilot.manage"
+      }
+    ],
+    "commands": [
+      {
+        "command": "kimiCopilot.manage",
+        "title": "Kimi: Manage Models"
+      },
+      {
+        "command": "kimiCopilot.setApiKey",
+        "title": "Kimi: Set API Key"
+      },
+      {
+        "command": "kimiCopilot.refreshModels",
+        "title": "Kimi: Refresh Models"
+      }
+    ],
+    "configuration": {
+      "title": "Kimi Copilot Presets",
+      "properties": {
+        "kimiCopilot.baseUrl": {
+          "type": "string",
+          "default": "https://api.moonshot.ai/v1",
+          "description": "Base URL for the Kimi/Moonshot API."
+        },
+        "kimiCopilot.showReasoning": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show raw reasoning_content in the chat output."
+        },
+        "kimiCopilot.enableExperimentalPresets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable experimental/generic presets for unknown Kimi models discovered via /v1/models."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.104.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "eslint": "^8.57.0"
+  }
+}

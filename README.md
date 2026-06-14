@@ -4,6 +4,8 @@ Use Kimi and Moonshot models from the normal Copilot Chat model picker.
 
 This extension is a BYOK provider. It does not add a second chat sidebar or a local proxy. Pick a Kimi model in Copilot Chat and keep using Copilot's agent mode, tools, instructions, and MCP setup.
 
+Repository: https://github.com/lucatotem/Kimi-Extension
+
 ## What It Adds
 
 - Kimi models in the Copilot Chat model picker
@@ -76,6 +78,8 @@ Press F5 in VS Code to launch an Extension Development Host.
 ## Notes
 
 Kimi rejects empty user messages. This extension drops empty text-only messages and preserves assistant tool calls with empty content, which is the shape expected by OpenAI-compatible tool-calling APIs.
+
+Development note: this extension was built by ivanray with AI assistance. The goal is to match the Copilot Chat BYOK provider experience while keeping the Kimi-specific request handling clear and reviewable.
 
 ## License
 

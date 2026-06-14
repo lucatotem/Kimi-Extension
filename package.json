@@ -2,11 +2,12 @@
   "name": "kimi-copilot-presets",
   "displayName": "Kimi for Copilot Chat",
   "description": "Use Kimi and Moonshot models from the Copilot Chat model picker with BYOK, thinking, vision, and agent tools.",
+  "icon": "resources/icon.png",
   "version": "0.0.1",
-  "publisher": "kimi-copilot-presets",
+  "publisher": "ivanray",
   "repository": {
     "type": "git",
-    "url": "https://github.com/user/kimi-copilot-presets"
+    "url": "https://github.com/lucatotem/Kimi-Extension"
   },
   "license": "MIT",
   "engines": {

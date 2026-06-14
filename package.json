@@ -3,7 +3,7 @@
   "displayName": "Kimi for Copilot Chat",
   "description": "Use Kimi and Moonshot models from the Copilot Chat model picker with BYOK, thinking, vision, and agent tools.",
   "icon": "resources/icon.png",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "ivanray",
   "repository": {
     "type": "git",

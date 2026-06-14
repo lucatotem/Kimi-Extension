@@ -1,203 +1,528 @@
 // src/kimiProvider.ts
 // VS Code LanguageModelChatProvider implementation for Kimi/Moonshot models.
-//
-// Responsibilities:
-//  1. Fetch models from Kimi's /v1/models endpoint on demand.
-//  2. Generate presets via the local capability registry.
-//  3. Expose models via provideLanguageModelChatInformation.
-//  4. Handle chat requests via provideLanguageModelChatResponse.
-//  5. Provide token counts via provideTokenCount.
 
 import * as vscode from "vscode";
 import { fetchKimiModels } from "./modelDiscovery";
-import { presetsForKimiModel } from "./presets";
-import { convertMessages } from "./messageConverter";
+import { convertMessages, convertTools, countMessageChars } from "./messageConverter";
 import { streamChatCompletion } from "./kimiClient";
 import { estimateTokenCount } from "./tokenCounter";
-import type { KimiPreset } from "./types";
+import { getKnownModelIdOverrides, mergeDiscoveredModels, supportsThinking } from "./presets";
+import type { KimiChatRequest, KimiPreset, KimiUsage } from "./types";
 
-const SECRET_KEY = "kimiCopilot.apiKey";
+const CONFIG_SECTION = "kimi-copilot";
+const LEGACY_CONFIG_SECTION = "kimiCopilot";
+const SECRET_KEY = "kimi-copilot.apiKey";
+const LEGACY_SECRET_KEY = "kimiCopilot.apiKey";
+const DEFAULT_BASE_URL = "https://api.moonshot.ai/v1";
+const USAGE_DATA_PART_MIME = "usage";
+const TOOL_LIMIT = 128;
+
+type ReasoningEffort = "none" | "high" | "max";
 
 export class KimiChatProvider implements vscode.LanguageModelChatProvider {
-  /** Cached list of presets. Cleared on API key change or forced refresh. */
   private presets: KimiPreset[] | undefined;
+  private readonly output = vscode.window.createOutputChannel("Kimi Copilot");
+  private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
+  readonly onDidChangeLanguageModelChatInformation = this.onDidChangeEmitter.event;
+  private charsPerToken = 4;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
-
-  // ── Public API ──────────────────────────────────────────────────────
-
-  /** Invalidate the preset cache so the next request re-discovers models. */
-  clearCache(): void {
-    this.presets = undefined;
+  constructor(private readonly context: vscode.ExtensionContext) {
+    context.subscriptions.push(
+      this.output,
+      this.onDidChangeEmitter,
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (
+          event.affectsConfiguration(CONFIG_SECTION) ||
+          event.affectsConfiguration(LEGACY_CONFIG_SECTION)
+        ) {
+          this.clearCache();
+        }
+      }),
+      context.secrets.onDidChange((event) => {
+        if (event.key === SECRET_KEY || event.key === LEGACY_SECRET_KEY) {
+          this.clearCache();
+        }
+      }),
+    );
   }
 
-  /** Eagerly load presets (used by the "Refresh Models" command). */
+  clearCache(): void {
+    this.presets = undefined;
+    this.onDidChangeEmitter.fire();
+  }
+
   async warmup(): Promise<void> {
     await this.loadPresets(false);
   }
 
-  // ── LanguageModelChatProvider implementation ────────────────────────
+  async configureApiKey(): Promise<void> {
+    const key = await vscode.window.showInputBox({
+      title: "Set Kimi API Key",
+      prompt: "Enter your Moonshot/Kimi API key",
+      placeHolder: "sk-...",
+      password: true,
+      ignoreFocusOut: true,
+      validateInput: (value) => (value.trim() ? undefined : "API key cannot be empty."),
+    });
 
-  /**
-   * Provide model metadata so VS Code can populate the model picker.
-   *
-   * Called by VS Code when the user opens the chat model picker.
-   * If `options.silent` is true, avoid showing error dialogs.
-   */
+    if (!key) {
+      return;
+    }
+
+    await this.context.secrets.store(SECRET_KEY, key.trim());
+    await this.context.secrets.delete(LEGACY_SECRET_KEY);
+    this.clearCache();
+    vscode.window.showInformationMessage("Kimi API key saved.");
+  }
+
+  async clearApiKey(): Promise<void> {
+    await this.context.secrets.delete(SECRET_KEY);
+    await this.context.secrets.delete(LEGACY_SECRET_KEY);
+    this.clearCache();
+    vscode.window.showInformationMessage("Kimi API key removed.");
+  }
+
+  openApiKeysPage(): void {
+    void vscode.env.openExternal(vscode.Uri.parse("https://platform.kimi.ai/"));
+  }
+
+  openSettings(): void {
+    void vscode.commands.executeCommand("workbench.action.openSettings", CONFIG_SECTION);
+  }
+
+  showLogs(): void {
+    this.output.show();
+  }
+
+  async openRequestDumpsFolder(): Promise<void> {
+    const root = await this.ensureRequestDumpRoot();
+    await vscode.commands.executeCommand("revealFileInOS", root);
+  }
+
   async provideLanguageModelChatInformation(
     options: { silent?: boolean },
     _token: vscode.CancellationToken,
   ): Promise<vscode.LanguageModelChatInformation[]> {
     const presets = await this.loadPresets(options.silent ?? false);
+    const hasKey = await this.hasApiKey();
 
-    return presets.map((preset) => {
-      const ctxLength = preset.contextLength ?? 256000; // fallback for Kimi models
-      return {
-        id: preset.presetId,
-        name: preset.displayName,
-        family: "kimi",
-        version: "1",
-        maxInputTokens: Math.max(0, ctxLength - preset.maxOutputTokens),
-        maxOutputTokens: preset.maxOutputTokens,
-        tooltip: preset.tooltip,
-        detail: `Model: ${preset.modelId}`,
-        capabilities: {
-          imageInput: false,
-          toolCalling: true,
-        },
-      } satisfies vscode.LanguageModelChatInformation;
-    });
+    return presets.map((preset) => toChatInformation(preset, hasKey));
   }
 
-  /**
-   * Handle a chat request from VS Code.
-   *
-   * Converts VS Code messages → Kimi format, streams the response,
-   * and reports results via the progress callback.
-   */
   async provideLanguageModelChatResponse(
     model: vscode.LanguageModelChatInformation,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
-    _options: vscode.ProvideLanguageModelChatResponseOptions,
-    progress: vscode.Progress<vscode.LanguageModelTextPart>,
+    options: vscode.ProvideLanguageModelChatResponseOptions,
+    progress: vscode.Progress<vscode.LanguageModelResponsePart>,
     token: vscode.CancellationToken,
   ): Promise<void> {
-    const apiKey = await this.getApiKey({ silent: false });
+    const apiKey = await this.getApiKey();
     if (!apiKey) {
-      throw new Error("Missing Kimi API key. Run Kimi: Set API Key to configure.");
+      throw new Error("Missing Kimi API key. Run Kimi: Set API Key to configure it.");
     }
 
-    const preset = (await this.loadPresets(false)).find(
-      (p) => p.presetId === model.id,
-    );
+    const preset = (await this.loadPresets(false)).find((p) => p.presetId === model.id);
     if (!preset) {
-      throw new Error(`Unknown Kimi preset: ${model.id}. Try running Kimi: Refresh Models.`);
+      throw new Error(`Unknown Kimi model: ${model.id}. Run Kimi: Refresh Models.`);
     }
 
-    const config = vscode.workspace.getConfiguration("kimiCopilot");
-    const baseUrl = config.get<string>("baseUrl", "https://api.moonshot.ai/v1");
-    const showReasoning = config.get<boolean>("showReasoning", false);
+    const reasoningEffort = getConfiguredThinkingEffort(options, preset);
+    const thinkingEnabled =
+      preset.capabilities.alwaysThinking ||
+      (preset.capabilities.thinking && reasoningEffort !== "none");
 
-    const kimiMessages = convertMessages(messages);
+    const kimiMessages = convertMessages(messages, {
+      includeReasoning: thinkingEnabled,
+    });
 
-    // Build request body by merging preset defaults with runtime params
-    const requestBody: Record<string, unknown> = {
-      ...preset.requestBody,
+    if (kimiMessages.length === 0) {
+      throw new Error("No supported text, media, or tool-result content was provided to Kimi.");
+    }
+
+    const tools = preset.capabilities.toolCalling ? convertTools(options.tools) : undefined;
+    if ((tools?.length ?? 0) > TOOL_LIMIT) {
+      throw new Error(`Kimi supports at most ${TOOL_LIMIT} tools per request.`);
+    }
+
+    const request: KimiChatRequest = {
+      model: getApiModelId(preset.presetId, preset.modelId),
       messages: kimiMessages,
+      stream: true,
+      tools,
+      tool_choice: tools && tools.length > 0 ? "auto" : undefined,
     };
 
-    // Create an AbortController wired to VS Code's cancellation token
+    const maxTokens = getMaxTokens();
+    if (maxTokens) {
+      request.max_tokens = maxTokens;
+    }
+
+    applyThinkingConfig(request, preset, reasoningEffort);
+
+    const baseUrl = getBaseUrl();
+    const totalRequestChars = countMessageChars(kimiMessages);
     const abortController = new AbortController();
     const disposable = token.onCancellationRequested(() => abortController.abort());
 
+    this.logRequestSummary(preset, request, reasoningEffort);
+    await this.dumpRequestIfEnabled(preset, request, reasoningEffort);
+
     try {
-      await streamChatCompletion(
-        baseUrl,
-        apiKey,
-        requestBody,
-        abortController.signal,
-        {
-          showReasoning,
-          onText: (text) => {
-            progress.report(new vscode.LanguageModelTextPart(text));
-          },
+      await streamChatCompletion(baseUrl, apiKey, request, abortController.signal, {
+        onContent: (text) => {
+          progress.report(new vscode.LanguageModelTextPart(text));
         },
-      );
+        onThinking: (text) => {
+          const part = createThinkingPart(text);
+          if (part) {
+            progress.report(part);
+          }
+        },
+        onToolCall: (toolCall) => {
+          progress.report(
+            new vscode.LanguageModelToolCallPart(
+              toolCall.id,
+              toolCall.function.name,
+              parseToolArguments(toolCall.function.arguments),
+            ),
+          );
+        },
+        onUsage: (usage) => {
+          this.updateCharsPerToken(totalRequestChars, usage);
+          reportUsage(progress, usage);
+        },
+      });
     } finally {
       disposable.dispose();
     }
   }
 
-  /**
-   * Estimate token count for a given text or message.
-   *
-   * Used by VS Code to check context-window limits before sending requests.
-   */
   async provideTokenCount(
-    model: vscode.LanguageModelChatInformation,
+    _model: vscode.LanguageModelChatInformation,
     input: string | vscode.LanguageModelChatRequestMessage,
     _token: vscode.CancellationToken,
   ): Promise<number> {
-    const result = estimateTokenCount(input);
+    const result = estimateTokenCount(input, this.charsPerToken);
     return result.tokens;
   }
 
-  // ── Internal helpers ────────────────────────────────────────────────
-
-  /**
-   * Load presets, fetching models from the API if the cache is empty.
-   *
-   * @param silent  If true, suppress error dialogs (e.g. when VS Code
-   *                probes providers in the background).
-   */
   private async loadPresets(silent: boolean): Promise<KimiPreset[]> {
     if (this.presets) {
       return this.presets;
     }
 
-    const apiKey = await this.getApiKey({ silent });
-    if (!apiKey) {
-      return [];
-    }
+    let discovered = undefined;
+    const apiKey = await this.getApiKey({ silent: true });
 
-    const config = vscode.workspace.getConfiguration("kimiCopilot");
-    const baseUrl = config.get<string>("baseUrl", "https://api.moonshot.ai/v1");
-
-    try {
-      const models = await fetchKimiModels(baseUrl, apiKey);
-
-      this.presets = models
-        .flatMap((m) => presetsForKimiModel(m))
-        .sort((a, b) => a.displayName.localeCompare(b.displayName));
-
-      return this.presets;
-    } catch (err) {
-      if (!silent) {
-        vscode.window.showErrorMessage(
-          `Kimi model discovery failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
+    if (apiKey && getEnableModelDiscovery()) {
+      try {
+        discovered = await fetchKimiModels(getBaseUrl(), apiKey);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.output.appendLine(`Model discovery failed: ${message}`);
+        if (!silent) {
+          vscode.window.showWarningMessage(`Kimi model discovery failed. Using bundled model list.`);
+        }
       }
-      return [];
     }
+
+    this.presets = mergeDiscoveredModels(discovered);
+    return this.presets;
   }
 
-  /**
-   * Retrieve the stored API key, optionally prompting the user.
-   *
-   * @param options.silent  If true, return undefined without prompting.
-   */
+  private async hasApiKey(): Promise<boolean> {
+    const key = await this.getApiKey({ silent: true });
+    return Boolean(key);
+  }
+
   private async getApiKey(options?: { silent?: boolean }): Promise<string | undefined> {
     const key = await this.context.secrets.get(SECRET_KEY);
-    if (key) {
-      return key;
+    if (key?.trim()) {
+      return key.trim();
     }
 
-    if (options?.silent) {
-      return undefined;
+    const legacyKey = await this.context.secrets.get(LEGACY_SECRET_KEY);
+    if (legacyKey?.trim()) {
+      return legacyKey.trim();
     }
 
-    // Trigger the set-API-key flow
-    await vscode.commands.executeCommand("kimiCopilot.setApiKey");
-    return this.context.secrets.get(SECRET_KEY);
+    const settingsKey = getConfigValue<string>("apiKey", "");
+    if (settingsKey.trim()) {
+      return settingsKey.trim();
+    }
+
+    return options?.silent ? undefined : undefined;
   }
+
+  private logRequestSummary(
+    preset: KimiPreset,
+    request: KimiChatRequest,
+    reasoningEffort: ReasoningEffort,
+  ): void {
+    if (getDebugMode() === "minimal") {
+      return;
+    }
+
+    this.output.appendLine(
+      JSON.stringify(
+        {
+          model: preset.presetId,
+          apiModel: request.model,
+          messages: request.messages.length,
+          tools: request.tools?.length ?? 0,
+          maxTokens: request.max_tokens ?? "api-default",
+          thinking: request.thinking ?? (preset.capabilities.alwaysThinking ? "always-on" : "off"),
+          reasoningEffort,
+        },
+        null,
+        2,
+      ),
+    );
+  }
+
+  private updateCharsPerToken(totalRequestChars: number, usage: KimiUsage): void {
+    const promptTokens = usage.prompt_tokens ?? 0;
+    if (totalRequestChars > 0 && promptTokens > 0) {
+      const observed = totalRequestChars / promptTokens;
+      this.charsPerToken = this.charsPerToken * 0.7 + observed * 0.3;
+    }
+  }
+
+  private async dumpRequestIfEnabled(
+    preset: KimiPreset,
+    request: KimiChatRequest,
+    reasoningEffort: ReasoningEffort,
+  ): Promise<void> {
+    if (getDebugMode() !== "verbose") {
+      return;
+    }
+
+    try {
+      const root = await this.ensureRequestDumpRoot();
+      const fileName = `${new Date().toISOString().replace(/[:.]/g, "-")}-${sanitizeFilePart(
+        preset.presetId,
+      )}.json`;
+      const file = vscode.Uri.joinPath(root, fileName);
+      const payload = {
+        model: preset.presetId,
+        apiModel: request.model,
+        reasoningEffort,
+        request,
+      };
+      await vscode.workspace.fs.writeFile(
+        file,
+        new TextEncoder().encode(JSON.stringify(payload, null, 2)),
+      );
+      this.output.appendLine(`Request dump written: ${file.fsPath}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.output.appendLine(`Request dump failed: ${message}`);
+    }
+  }
+
+  private async ensureRequestDumpRoot(): Promise<vscode.Uri> {
+    const root = vscode.Uri.joinPath(this.context.globalStorageUri, "request-dumps");
+    await vscode.workspace.fs.createDirectory(root);
+    return root;
+  }
+}
+
+function toChatInformation(
+  preset: KimiPreset,
+  hasApiKey: boolean,
+): vscode.LanguageModelChatInformation {
+  const apiKeyRequired = "Kimi API key required";
+  return {
+    id: preset.presetId,
+    name: preset.displayName,
+    family: preset.family,
+    version: preset.version,
+    maxInputTokens: preset.maxInputTokens,
+    maxOutputTokens: preset.maxOutputTokens,
+    detail: hasApiKey ? preset.detail : apiKeyRequired,
+    tooltip: hasApiKey ? preset.tooltip : apiKeyRequired,
+    capabilities: {
+      imageInput: preset.capabilities.imageInput,
+      toolCalling: preset.capabilities.toolCalling,
+    },
+    ...extraModelInfo(preset, hasApiKey),
+  } as vscode.LanguageModelChatInformation;
+}
+
+function extraModelInfo(preset: KimiPreset, hasApiKey: boolean): Record<string, unknown> {
+  return {
+    isUserSelectable: true,
+    statusIcon: hasApiKey ? undefined : new vscode.ThemeIcon("warning"),
+    ...(supportsThinking(preset) ? { configurationSchema: buildThinkingSchema(preset) } : {}),
+  };
+}
+
+function buildThinkingSchema(preset: KimiPreset): object {
+  const canDisable = preset.capabilities.canDisableThinking;
+  const values = canDisable ? ["none", "high", "max"] : ["high", "max"];
+
+  return {
+    properties: {
+      reasoningEffort: {
+        type: "string",
+        title: "Thinking",
+        enum: values,
+        enumItemLabels: values.map((value) => labelForThinkingEffort(value as ReasoningEffort)),
+        enumDescriptions: values.map((value) =>
+          descriptionForThinkingEffort(value as ReasoningEffort, preset),
+        ),
+        default: "high",
+        group: "navigation",
+      },
+    },
+  };
+}
+
+function labelForThinkingEffort(value: ReasoningEffort): string {
+  if (value === "none") {
+    return "None";
+  }
+  if (value === "max") {
+    return "Max";
+  }
+  return "High";
+}
+
+function descriptionForThinkingEffort(value: ReasoningEffort, preset: KimiPreset): string {
+  if (value === "none") {
+    return "Disable Kimi thinking for faster replies when the model supports it.";
+  }
+  if (value === "max" && preset.capabilities.supportsPreservedThinking) {
+    return "Enable thinking and keep previous reasoning content across turns.";
+  }
+  if (value === "max") {
+    return "Enable thinking. This model does not support preserved thinking.";
+  }
+  return "Enable Kimi thinking for the current request.";
+}
+
+function getConfiguredThinkingEffort(
+  options: vscode.ProvideLanguageModelChatResponseOptions,
+  preset: KimiPreset,
+): ReasoningEffort {
+  const rawOptions = options as {
+    modelConfiguration?: { reasoningEffort?: unknown };
+    configuration?: { reasoningEffort?: unknown };
+  };
+  const configured =
+    rawOptions.modelConfiguration?.reasoningEffort ?? rawOptions.configuration?.reasoningEffort;
+
+  if (configured === "none" && preset.capabilities.canDisableThinking) {
+    return "none";
+  }
+  if (configured === "max") {
+    return "max";
+  }
+  return "high";
+}
+
+function applyThinkingConfig(
+  request: KimiChatRequest,
+  preset: KimiPreset,
+  effort: ReasoningEffort,
+): void {
+  if (!preset.capabilities.thinking || preset.capabilities.alwaysThinking) {
+    return;
+  }
+
+  if (effort === "none" && preset.capabilities.canDisableThinking) {
+    request.thinking = { type: "disabled" };
+    return;
+  }
+
+  request.thinking = { type: "enabled" };
+  if (effort === "max" && preset.capabilities.supportsPreservedThinking) {
+    request.thinking.keep = "all";
+  }
+}
+
+function createThinkingPart(text: string): vscode.LanguageModelResponsePart | undefined {
+  const ctor = (vscode as typeof vscode & {
+    LanguageModelThinkingPart?: new (value: string | string[]) => vscode.LanguageModelResponsePart;
+  }).LanguageModelThinkingPart;
+
+  if (typeof ctor !== "function") {
+    return undefined;
+  }
+
+  return new ctor(text);
+}
+
+function parseToolArguments(argumentsText: string): object {
+  try {
+    const parsed = JSON.parse(argumentsText);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function reportUsage(
+  progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+  usage: KimiUsage,
+): void {
+  try {
+    const data = {
+      prompt_tokens: usage.prompt_tokens ?? 0,
+      completion_tokens: usage.completion_tokens ?? 0,
+      total_tokens: usage.total_tokens ?? 0,
+      prompt_tokens_details: {
+        cached_tokens: usage.prompt_cache_hit_tokens ?? 0,
+      },
+    };
+    progress.report(
+      new vscode.LanguageModelDataPart(
+        new TextEncoder().encode(JSON.stringify(data)),
+        USAGE_DATA_PART_MIME,
+      ),
+    );
+  } catch {
+    // Usage data is best-effort. It should never break the chat response.
+  }
+}
+
+function getBaseUrl(): string {
+  return getConfigValue("baseUrl", DEFAULT_BASE_URL).replace(/\/$/, "");
+}
+
+function getMaxTokens(): number | undefined {
+  const value = getConfigValue("maxTokens", 0);
+  return value > 0 ? value : undefined;
+}
+
+function getEnableModelDiscovery(): boolean {
+  return getConfigValue("enableModelDiscovery", true);
+}
+
+function getDebugMode(): "minimal" | "metadata" | "verbose" {
+  const value = getConfigValue<string>("debugMode", "minimal");
+  return value === "metadata" || value === "verbose" ? value : "minimal";
+}
+
+function getApiModelId(vscodeModelId: string, defaultModelId: string): string {
+  const overrides = getConfigValue<Record<string, string>>(
+    "modelIdOverrides",
+    getKnownModelIdOverrides(),
+  );
+  return overrides?.[vscodeModelId]?.trim() || defaultModelId;
+}
+
+function getConfigValue<T>(key: string, defaultValue: T): T {
+  const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+  const value = config.get<T>(key);
+  if (value !== undefined) {
+    return value;
+  }
+
+  const legacyConfig = vscode.workspace.getConfiguration(LEGACY_CONFIG_SECTION);
+  return legacyConfig.get<T>(key, defaultValue);
+}
+
+function sanitizeFilePart(value: string): string {
+  return value.replace(/[^a-z0-9_.-]/gi, "_");
 }

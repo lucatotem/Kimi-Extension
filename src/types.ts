@@ -1,5 +1,33 @@
 // src/types.ts
-// Shared type definitions for the Kimi Copilot Presets extension.
+// Shared type definitions for the Kimi Copilot provider.
+
+export type KimiRole = "system" | "user" | "assistant" | "tool";
+
+export interface KimiTextContentPart {
+  type: "text";
+  text: string;
+}
+
+export interface KimiImageContentPart {
+  type: "image_url";
+  image_url: {
+    url: string;
+  };
+}
+
+export interface KimiVideoContentPart {
+  type: "video_url";
+  video_url: {
+    url: string;
+  };
+}
+
+export type KimiContentPart =
+  | KimiTextContentPart
+  | KimiImageContentPart
+  | KimiVideoContentPart;
+
+export type KimiMessageContent = string | KimiContentPart[];
 
 /** Raw model object returned by Kimi's GET /v1/models endpoint. */
 export interface KimiModel {
@@ -13,24 +41,28 @@ export interface KimiModel {
   supports_reasoning?: boolean;
 }
 
-/** A fully-resolved preset combining model metadata with request parameters. */
+export interface KimiCapabilities {
+  toolCalling: boolean | number;
+  imageInput: boolean;
+  thinking: boolean;
+  canDisableThinking: boolean;
+  supportsPreservedThinking: boolean;
+  alwaysThinking: boolean;
+}
+
+/** A model entry exposed to VS Code. */
 export interface KimiPreset {
-  /** Unique identifier exposed to VS Code as the model ID. */
   presetId: string;
-  /** Human-readable name shown in the model picker. */
   displayName: string;
-  /** The underlying Kimi model ID (e.g. "kimi-k2.6"). */
   modelId: string;
-  /** Maximum output tokens for this preset. */
-  maxOutputTokens: number;
-  /** The request body merged into every chat completion call. */
-  requestBody: Record<string, unknown>;
-  /** Tooltip text shown in the picker. */
+  version: string;
+  family: string;
+  detail: string;
   tooltip: string;
-  /** Whether reasoning_content must be preserved across turns. */
-  preserveReasoning: boolean;
-  /** The discovered context length from /v1/models, if available. */
-  contextLength?: number;
+  contextLength: number;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+  capabilities: KimiCapabilities;
 }
 
 /** SSE delta from a Kimi streaming response. */
@@ -38,11 +70,21 @@ export interface KimiStreamDelta {
   role?: string;
   content?: string;
   reasoning_content?: string;
-  tool_calls?: KimiToolCall[];
+  tool_calls?: KimiToolCallDelta[];
 }
 
-/** A single tool-call delta from the stream. */
+/** A complete tool call sent to or emitted from the Kimi API. */
 export interface KimiToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+/** A single streaming tool-call delta from the API. */
+export interface KimiToolCallDelta {
   index?: number;
   id?: string;
   type?: "function";
@@ -52,20 +94,50 @@ export interface KimiToolCall {
   };
 }
 
-/** Options passed to the SSE stream parser. */
-export interface StreamHandlerOptions {
-  /** Whether to surface reasoning_content in the output. */
-  showReasoning: boolean;
-  /** Called for each text fragment (content or reasoning). */
-  onText: (text: string) => void;
-  /** Optional callback when a complete tool call is assembled. */
-  onToolCall?: (call: KimiToolCall) => void;
+export interface KimiToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description?: string;
+    parameters?: object;
+  };
 }
 
-/** Simplified message format sent to the Kimi API. */
 export interface KimiMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
+  role: KimiRole;
+  content: KimiMessageContent;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: KimiToolCall[];
+  reasoning_content?: string;
+}
+
+export interface KimiUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  prompt_cache_hit_tokens?: number;
+}
+
+export interface KimiChatRequest {
+  model: string;
+  messages: KimiMessage[];
+  stream: true;
+  max_tokens?: number;
+  tools?: KimiToolDefinition[];
+  tool_choice?: "auto" | "none";
+  thinking?: {
+    type: "enabled" | "disabled";
+    keep?: "all";
+  };
+}
+
+/** Options passed to the SSE stream parser. */
+export interface StreamHandlerOptions {
+  onContent: (text: string) => void;
+  onThinking: (text: string) => void;
+  onToolCall?: (call: KimiToolCall) => void;
+  onUsage?: (usage: KimiUsage) => void;
 }
 
 /** Result of fetching models from the Kimi API. */
@@ -75,8 +147,6 @@ export interface KimiModelsResponse {
 
 /** Result of a token count estimation. */
 export interface TokenCountResult {
-  /** Estimated number of tokens. */
   tokens: number;
-  /** How the estimate was derived. */
   method: "approximation" | "api";
 }

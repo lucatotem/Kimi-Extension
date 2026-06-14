@@ -1,63 +1,81 @@
-# Kimi Copilot Presets
+# Kimi for Copilot Chat
 
-Adds **Kimi / Moonshot** chat models to VS Code's Copilot Chat model picker — with automatic model discovery.
+Use Kimi and Moonshot models from the normal Copilot Chat model picker.
 
-## Features
+This extension is a BYOK provider. It does not add a second chat sidebar or a local proxy. Pick a Kimi model in Copilot Chat and keep using Copilot's agent mode, tools, instructions, and MCP setup.
 
-- **Auto-discovers** available Kimi models via the `/v1/models` API
-- **Curated presets** for `kimi-k2.6` and `kimi-k2.7-code` with correct `thinking` configurations
-- **Hides reasoning_content** by default (toggle via `kimiCopilot.showReasoning`)
-- **Secure API key storage** using VS Code's `SecretStorage`
-- **Streaming** SSE chat completions
-- **Extensible** — new Kimi models appear automatically via the generic fallback
+## What It Adds
 
-## Quick Start
+- Kimi models in the Copilot Chat model picker
+- API key storage through VS Code SecretStorage
+- Native Copilot thinking blocks for Kimi `reasoning_content`
+- Tool calls and tool results for agent mode
+- Image and video content for Kimi models that support multimodal input
+- Optional model discovery through Kimi's `/v1/models` endpoint
+- Model ID overrides for compatible proxies
 
-1. Install the extension
-2. Run `Kimi: Set API Key` from the Command Palette
-3. Enter your [Moonshot/Kimi API key](https://platform.kimi.ai/)
-4. Open Copilot Chat — your Kimi models appear in the model picker
+## Models
 
-All Kimi models have a **256k token context window**.
+The bundled picker entries are based on the current Kimi model list:
 
-## Available Presets
+| Model | Use for |
+| --- | --- |
+| Kimi K2.7 Code | Coding and agent tasks. Thinking is always on. |
+| Kimi K2.6 | General coding, agent tasks, text, image, and video. Thinking can be turned off. |
+| Kimi K2.5 | Previous K2 model with thinking and multimodal input. |
+| Moonshot V1 8K / 32K / 128K | Text generation at different context lengths. |
+| Moonshot V1 Vision 8K / 32K / 128K | Image understanding with text output. |
 
-| Preset | Model | Max Output | Context | Description |
-|---|---|---|---|---|
-| Kimi K2.7 Code — 32k | `kimi-k2.7-code` | 32,768 | 256k | Code-focused, thinking always on |
-| Kimi K2.7 Code — 64k | `kimi-k2.7-code` | 65,536 | 256k | Longer output for large coding tasks |
-| Kimi K2.6 — Thinking 32k | `kimi-k2.6` | 32,768 | 256k | General-purpose thinking mode |
-| Kimi K2.6 — Instant 16k | `kimi-k2.6` | 16,384 | 256k | No-thinking for quick edits |
-| Kimi K2.6 — Thinking Keep 32k | `kimi-k2.6` | 32,768 | 256k | Preserves reasoning across turns |
+When an API key is configured, the extension can also merge models returned by `GET /v1/models`.
+
+## Thinking
+
+Kimi thinking models stream `reasoning_content` before the final answer. The extension reports those chunks as Copilot thinking parts, so they render separately from the response.
+
+The Copilot model picker shows a Thinking control where Kimi supports it:
+
+| Value | Kimi request |
+| --- | --- |
+| None | `thinking: { "type": "disabled" }` on K2.6/K2.5 |
+| High | `thinking: { "type": "enabled" }` |
+| Max | Enables thinking and uses `keep: "all"` where Kimi supports preserved thinking |
+
+Kimi K2.7 Code cannot disable thinking, so the picker only offers supported values for that model.
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `Kimi: Set API Key` | Store or update your Kimi API key |
-| `Kimi: Refresh Models` | Re-discover models from the Kimi API |
-| `Kimi: Manage Models` | Management hub for all Kimi settings |
+| Command | What it does |
+| --- | --- |
+| `Kimi: Set API Key` | Store your Kimi API key |
+| `Kimi: Open API Keys` | Open the Kimi API key page |
+| `Kimi: Clear API Key` | Remove the stored key |
+| `Kimi: Open Settings` | Open extension settings |
+| `Kimi: Show Logs` | Open the Kimi output channel |
+| `Kimi: Open Request Dumps Folder` | Open verbose request dumps |
+| `Kimi: Refresh Models` | Clear the model cache and run discovery again |
 
 ## Settings
 
-| Setting | Default | Description |
-|---|---|---|
-| `kimiCopilot.baseUrl` | `https://api.moonshot.ai/v1` | Base URL for the Kimi API |
-| `kimiCopilot.showReasoning` | `false` | Show raw reasoning_content in chat output |
-| `kimiCopilot.enableExperimentalPresets` | `true` | Generate generic presets for unknown Kimi models |
-
-## Requirements
-
-- VS Code `^1.104.0` (for `LanguageModelChatProvider` API)
-- A [Kimi/Moonshot API key](https://platform.kimi.ai/)
+| Setting | Default | Notes |
+| --- | --- | --- |
+| `kimi-copilot.baseUrl` | `https://api.moonshot.ai/v1` | Change this for compatible proxies. |
+| `kimi-copilot.maxTokens` | `0` | `0` leaves the output limit to the API default. |
+| `kimi-copilot.enableModelDiscovery` | `true` | Adds models returned by `/v1/models` when a key is set. |
+| `kimi-copilot.modelIdOverrides` | official IDs | Maps picker entries to API model IDs. |
+| `kimi-copilot.debugMode` | `minimal` | `verbose` writes full request dumps. Use it only while diagnosing issues. |
 
 ## Development
 
 ```bash
 npm install
 npm run compile
-# Press F5 to launch the Extension Development Host
 ```
+
+Press F5 in VS Code to launch an Extension Development Host.
+
+## Notes
+
+Kimi rejects empty user messages. This extension drops empty text-only messages and preserves assistant tool calls with empty content, which is the shape expected by OpenAI-compatible tool-calling APIs.
 
 ## License
 

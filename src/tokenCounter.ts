@@ -1,7 +1,5 @@
 // src/tokenCounter.ts
 // Provides token-count estimation for Kimi models.
-// Uses a simple character-based heuristic; a future version may call
-// Kimi's dedicated token endpoint for exact counts.
 
 import type { LanguageModelChatRequestMessage } from "vscode";
 import type { TokenCountResult } from "./types";
@@ -17,10 +15,11 @@ import type { TokenCountResult } from "./types";
  */
 export function estimateTokenCount(
   input: string | LanguageModelChatRequestMessage,
+  charsPerToken = 4,
 ): TokenCountResult {
   const raw = typeof input === "string" ? input : messageToString(input);
   return {
-    tokens: Math.ceil(raw.length / 4),
+    tokens: Math.ceil(raw.length / Math.max(charsPerToken, 1)),
     method: "approximation",
   };
 }
@@ -37,6 +36,13 @@ function messageToString(msg: LanguageModelChatRequestMessage): string {
       typeof (part as { value: unknown }).value === "string"
     ) {
       parts.push((part as { value: string }).value);
+    } else if (
+      typeof part === "object" &&
+      part !== null &&
+      "data" in part &&
+      (part as { data?: unknown }).data instanceof Uint8Array
+    ) {
+      parts.push(`[binary:${(part as { data: Uint8Array }).data.byteLength}]`);
     }
   }
 

@@ -1,7 +1,7 @@
 {
   "name": "kimi-copilot-presets",
-  "displayName": "Kimi Copilot Presets",
-  "description": "Adds Kimi/Moonshot chat models to VS Code Chat with automatic model discovery.",
+  "displayName": "Kimi for Copilot Chat",
+  "description": "Use Kimi and Moonshot models from the Copilot Chat model picker with BYOK, thinking, vision, and agent tools.",
   "version": "0.0.1",
   "publisher": "kimi-copilot-presets",
   "repository": {
@@ -10,17 +10,23 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.104.0"
+    "vscode": "^1.116.0"
   },
   "categories": [
-    "Machine Learning",
-    "Chat"
+    "AI",
+    "Chat",
+    "Machine Learning"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onLanguageModelChatProvider:kimi",
-    "onCommand:kimiCopilot.manage",
-    "onCommand:kimiCopilot.setApiKey",
-    "onCommand:kimiCopilot.refreshModels"
+    "onCommand:kimi-copilot.setApiKey",
+    "onCommand:kimi-copilot.getApiKey",
+    "onCommand:kimi-copilot.clearApiKey",
+    "onCommand:kimi-copilot.openSettings",
+    "onCommand:kimi-copilot.showLogs",
+    "onCommand:kimi-copilot.openRequestDumpsFolder",
+    "onCommand:kimi-copilot.refreshModels"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -28,40 +34,95 @@
       {
         "vendor": "kimi",
         "displayName": "Kimi",
-        "managementCommand": "kimiCopilot.manage"
+        "managementCommand": "kimi-copilot.openSettings"
       }
     ],
     "commands": [
       {
-        "command": "kimiCopilot.manage",
-        "title": "Kimi: Manage Models"
-      },
-      {
-        "command": "kimiCopilot.setApiKey",
+        "command": "kimi-copilot.setApiKey",
         "title": "Kimi: Set API Key"
       },
       {
-        "command": "kimiCopilot.refreshModels",
+        "command": "kimi-copilot.getApiKey",
+        "title": "Kimi: Open API Keys"
+      },
+      {
+        "command": "kimi-copilot.clearApiKey",
+        "title": "Kimi: Clear API Key"
+      },
+      {
+        "command": "kimi-copilot.openSettings",
+        "title": "Kimi: Open Settings"
+      },
+      {
+        "command": "kimi-copilot.showLogs",
+        "title": "Kimi: Show Logs"
+      },
+      {
+        "command": "kimi-copilot.openRequestDumpsFolder",
+        "title": "Kimi: Open Request Dumps Folder"
+      },
+      {
+        "command": "kimi-copilot.refreshModels",
         "title": "Kimi: Refresh Models"
       }
     ],
     "configuration": {
-      "title": "Kimi Copilot Presets",
+      "title": "Kimi for Copilot Chat",
       "properties": {
-        "kimiCopilot.baseUrl": {
+        "kimi-copilot.baseUrl": {
           "type": "string",
           "default": "https://api.moonshot.ai/v1",
-          "description": "Base URL for the Kimi/Moonshot API."
+          "description": "Base URL for the Kimi/Moonshot OpenAI-compatible API."
         },
-        "kimiCopilot.showReasoning": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show raw reasoning_content in the chat output."
+        "kimi-copilot.maxTokens": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Max output tokens to request. 0 uses the API default."
         },
-        "kimiCopilot.enableExperimentalPresets": {
+        "kimi-copilot.enableModelDiscovery": {
           "type": "boolean",
           "default": true,
-          "description": "Enable experimental/generic presets for unknown Kimi models discovered via /v1/models."
+          "description": "Fetch /v1/models when an API key is configured and merge discovered models into the picker."
+        },
+        "kimi-copilot.modelIdOverrides": {
+          "type": "object",
+          "default": {
+            "kimi-k2.7-code": "kimi-k2.7-code",
+            "kimi-k2.6": "kimi-k2.6",
+            "kimi-k2.5": "kimi-k2.5",
+            "moonshot-v1-8k": "moonshot-v1-8k",
+            "moonshot-v1-32k": "moonshot-v1-32k",
+            "moonshot-v1-128k": "moonshot-v1-128k",
+            "moonshot-v1-8k-vision-preview": "moonshot-v1-8k-vision-preview",
+            "moonshot-v1-32k-vision-preview": "moonshot-v1-32k-vision-preview",
+            "moonshot-v1-128k-vision-preview": "moonshot-v1-128k-vision-preview"
+          },
+          "description": "API model IDs to send for each Kimi picker entry. Change this for compatible proxies with different model names.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "kimi-copilot.debugMode": {
+          "type": "string",
+          "default": "minimal",
+          "enum": [
+            "minimal",
+            "metadata",
+            "verbose"
+          ],
+          "enumItemLabels": [
+            "Minimal",
+            "Metadata",
+            "Verbose"
+          ],
+          "markdownEnumDescriptions": [
+            "Only show warnings and errors.",
+            "Log request metadata without prompt text.",
+            "Write full request dumps under extension global storage. Avoid this mode when prompts contain sensitive data."
+          ],
+          "markdownDescription": "Controls diagnostic logging in the Kimi output channel."
         }
       }
     }
@@ -73,7 +134,7 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
-    "@types/vscode": "^1.104.0",
+    "@types/vscode": "^1.116.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "eslint": "^8.57.0"

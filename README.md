@@ -10,6 +10,7 @@ Repository: https://github.com/lucatotem/Kimi-Extension
 
 - Kimi models in the Copilot Chat model picker
 - API key storage through VS Code SecretStorage
+- Optional one-time import from `KIMI_API_KEY` or `MOONSHOT_API_KEY`
 - Native Copilot thinking blocks for Kimi `reasoning_content`
 - Tool calls and tool results for agent mode
 - Image and video content for Kimi models that support multimodal input
@@ -65,6 +66,19 @@ Kimi K2.7 Code cannot disable thinking, so the picker only offers supported valu
 | `kimi-copilot.enableModelDiscovery` | `true` | Adds models returned by `/v1/models` when a key is set. |
 | `kimi-copilot.modelIdOverrides` | official IDs | Maps picker entries to API model IDs. |
 | `kimi-copilot.debugMode` | `minimal` | `verbose` writes full request dumps. Use it only while diagnosing issues. |
+
+## API Key Storage
+
+Use `Kimi: Set API Key` once. The key is stored with VS Code SecretStorage, which uses the operating system keychain where VS Code supports it.
+
+You can also start VS Code with one of these environment variables set:
+
+```bash
+KIMI_API_KEY=sk-...
+MOONSHOT_API_KEY=sk-...
+```
+
+When the extension sees one of those variables and no key is already stored, it imports the value into SecretStorage. After that, you do not need to recreate or re-enter the key each time you use the extension.
 
 ## Development
 

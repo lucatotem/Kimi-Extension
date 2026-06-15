@@ -16,6 +16,7 @@ const LEGACY_SECRET_KEY = "kimiCopilot.apiKey";
 const DEFAULT_BASE_URL = "https://api.moonshot.ai/v1";
 const USAGE_DATA_PART_MIME = "usage";
 const TOOL_LIMIT = 128;
+const API_KEY_ENV_NAMES = ["KIMI_API_KEY", "MOONSHOT_API_KEY"];
 
 type ReasoningEffort = "none" | "high" | "max";
 
@@ -248,10 +249,25 @@ export class KimiChatProvider implements vscode.LanguageModelChatProvider {
 
     const settingsKey = getConfigValue<string>("apiKey", "");
     if (settingsKey.trim()) {
-      return settingsKey.trim();
+      const normalized = settingsKey.trim();
+      await this.persistImportedApiKey(normalized, "settings");
+      return normalized;
+    }
+
+    const envKey = getEnvApiKey();
+    if (envKey) {
+      await this.persistImportedApiKey(envKey, "environment");
+      return envKey;
     }
 
     return options?.silent ? undefined : undefined;
+  }
+
+  private async persistImportedApiKey(apiKey: string, source: "environment" | "settings"): Promise<void> {
+    await this.context.secrets.store(SECRET_KEY, apiKey);
+    await this.context.secrets.delete(LEGACY_SECRET_KEY);
+    this.output.appendLine(`Imported Kimi API key from ${source} into VS Code SecretStorage.`);
+    this.clearCache();
   }
 
   private logRequestSummary(
@@ -525,4 +541,14 @@ function getConfigValue<T>(key: string, defaultValue: T): T {
 
 function sanitizeFilePart(value: string): string {
   return value.replace(/[^a-z0-9_.-]/gi, "_");
+}
+
+function getEnvApiKey(): string | undefined {
+  for (const name of API_KEY_ENV_NAMES) {
+    const value = process.env[name]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
 }

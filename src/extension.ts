@@ -9,11 +9,21 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.lm.registerLanguageModelChatProvider("kimi", provider),
+    vscode.commands.registerCommand("kimi-copilot.switchApiMode", () => provider.switchApiMode()),
     vscode.commands.registerCommand("kimi-copilot.setApiKey", () => provider.configureApiKey()),
+    vscode.commands.registerCommand("kimi-copilot.setKimiCodeApiKey", () =>
+      provider.configureKimiCodeApiKey(),
+    ),
     vscode.commands.registerCommand("kimi-copilot.getApiKey", () => provider.openApiKeysPage()),
     vscode.commands.registerCommand("kimi-copilot.clearApiKey", () => provider.clearApiKey()),
+    vscode.commands.registerCommand("kimi-copilot.clearKimiCodeApiKey", () =>
+      provider.clearKimiCodeApiKey(),
+    ),
     vscode.commands.registerCommand("kimi-copilot.openSettings", () => provider.openSettings()),
     vscode.commands.registerCommand("kimi-copilot.showLogs", () => provider.showLogs()),
+    vscode.commands.registerCommand("kimi-copilot.testConnection", () =>
+      provider.testConnection(),
+    ),
     vscode.commands.registerCommand("kimi-copilot.openRequestDumpsFolder", () =>
       provider.openRequestDumpsFolder(),
     ),

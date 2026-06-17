@@ -11,6 +11,7 @@ Repository: https://github.com/lucatotem/Kimi-Extension
 - Kimi models in the Copilot Chat model picker
 - API key storage through VS Code SecretStorage
 - Optional one-time import from `KIMI_API_KEY` or `MOONSHOT_API_KEY`
+- A switchable API mode for Kimi Platform, Kimi Code Plan, or custom proxies
 - Native Copilot thinking blocks for Kimi `reasoning_content`
 - Tool calls and tool results for agent mode
 - Image and video content for Kimi models that support multimodal input
@@ -23,6 +24,7 @@ The bundled picker entries are based on the current Kimi model list:
 
 | Model | Use for |
 | --- | --- |
+| Kimi Code | Kimi Code subscription/coding-plan users. Uses `kimi-for-coding`. |
 | Kimi K2.7 Code | Coding and agent tasks. Thinking is always on. |
 | Kimi K2.6 | General coding, agent tasks, text, image, and video. Thinking can be turned off. |
 | Kimi K2.5 | Previous K2 model with thinking and multimodal input. |
@@ -30,6 +32,28 @@ The bundled picker entries are based on the current Kimi model list:
 | Moonshot V1 Vision 8K / 32K / 128K | Image understanding with text output. |
 
 When an API key is configured, the extension can also merge models returned by `GET /v1/models`.
+
+## API Modes
+
+Use `Kimi: Switch API Mode` or the `kimi-copilot.apiMode` setting to choose the backend:
+
+| Mode | Endpoint | Key command | Notes |
+| --- | --- | --- | --- |
+| Kimi Platform (Pay as you go) | `https://api.moonshot.ai/v1` | `Kimi: Set API Key` | Default mode for existing pay-as-you-go API keys. |
+| Kimi Code Plan | `https://api.kimi.com/coding/v1` | `Kimi: Set Kimi Code API Key` | Uses the `kimi-for-coding` model ID required by the Kimi Code endpoint. |
+| Custom Base URL | `kimi-copilot.baseUrl` | `Kimi: Set API Key` | For OpenAI-compatible proxies or manually configured endpoints. |
+
+Switching modes does not delete stored keys. The regular pay-as-you-go key is stored separately from the Kimi Code key, so users can move between modes without re-entering the other key.
+
+To use a Kimi Code subscription plan:
+
+1. Run `Kimi: Switch API Mode`.
+2. Choose `Kimi Code Plan`.
+3. Run `Kimi: Set Kimi Code API Key`.
+4. Run `Kimi: Refresh Models` or reload VS Code.
+5. Pick `Kimi Code` from the Copilot Chat model picker.
+
+For diagnostics, run `Kimi: Test Connection` and then `Kimi: Show Logs`. The test reports whether the endpoint returned an HTTP status, or whether the request failed before reaching HTTP.
 
 ## Thinking
 
@@ -49,11 +73,15 @@ Kimi K2.7 Code cannot disable thinking, so the picker only offers supported valu
 
 | Command | What it does |
 | --- | --- |
-| `Kimi: Set API Key` | Store your Kimi API key |
+| `Kimi: Switch API Mode` | Choose Kimi Platform, Kimi Code Plan, or Custom Base URL |
+| `Kimi: Set API Key` | Store your Kimi Platform or custom endpoint API key |
+| `Kimi: Set Kimi Code API Key` | Store your Kimi Code subscription API key |
 | `Kimi: Open API Keys` | Open the Kimi API key page |
-| `Kimi: Clear API Key` | Remove the stored key |
+| `Kimi: Clear API Key` | Remove the stored Kimi Platform/custom key |
+| `Kimi: Clear Kimi Code API Key` | Remove only the stored Kimi Code key |
 | `Kimi: Open Settings` | Open extension settings |
 | `Kimi: Show Logs` | Open the Kimi output channel |
+| `Kimi: Test Connection` | Test `/models` and write the HTTP result or fetch failure cause to logs |
 | `Kimi: Open Request Dumps Folder` | Open verbose request dumps |
 | `Kimi: Refresh Models` | Clear the model cache and run discovery again |
 
@@ -61,24 +89,26 @@ Kimi K2.7 Code cannot disable thinking, so the picker only offers supported valu
 
 | Setting | Default | Notes |
 | --- | --- | --- |
-| `kimi-copilot.baseUrl` | `https://api.moonshot.ai/v1` | Change this for compatible proxies. |
+| `kimi-copilot.apiMode` | `platform` | Selects Kimi Platform, Kimi Code Plan, or Custom Base URL. |
+| `kimi-copilot.baseUrl` | `https://api.moonshot.ai/v1` | Used when `apiMode` is `custom`. Older installs with a custom `baseUrl` and no `apiMode` setting keep using that URL. |
 | `kimi-copilot.maxTokens` | `0` | `0` leaves the output limit to the API default. |
-| `kimi-copilot.enableModelDiscovery` | `true` | Adds models returned by `/v1/models` when a key is set. |
+| `kimi-copilot.enableModelDiscovery` | `true` | Adds models returned by `/v1/models` when a key is set. Kimi Code mode uses the bundled `Kimi Code` preset instead. |
 | `kimi-copilot.modelIdOverrides` | official IDs | Maps picker entries to API model IDs. |
 | `kimi-copilot.debugMode` | `minimal` | `verbose` writes full request dumps. Use it only while diagnosing issues. |
 
 ## API Key Storage
 
-Use `Kimi: Set API Key` once. The key is stored with VS Code SecretStorage, which uses the operating system keychain where VS Code supports it.
+Use `Kimi: Set API Key` once for Kimi Platform or custom endpoints. Use `Kimi: Set Kimi Code API Key` for the Kimi Code plan. Both keys are stored with VS Code SecretStorage, which uses the operating system keychain where VS Code supports it.
 
 You can also start VS Code with one of these environment variables set:
 
 ```bash
 KIMI_API_KEY=sk-...
 MOONSHOT_API_KEY=sk-...
+KIMI_CODE_API_KEY=sk-...
 ```
 
-When the extension sees one of those variables and no key is already stored, it imports the value into SecretStorage. After that, you do not need to recreate or re-enter the key each time you use the extension.
+When the extension sees one of those variables and no matching key is already stored, it imports the value into SecretStorage. `KIMI_API_KEY` and `MOONSHOT_API_KEY` import into the regular key slot; `KIMI_CODE_API_KEY` imports into the Kimi Code key slot. After that, you do not need to recreate or re-enter the key each time you use the extension.
 
 ## Development
 

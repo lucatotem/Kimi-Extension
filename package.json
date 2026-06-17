@@ -3,7 +3,7 @@
   "displayName": "Kimi for Copilot Chat",
   "description": "Use Kimi and Moonshot models from the Copilot Chat model picker with BYOK, thinking, vision, and agent tools.",
   "icon": "resources/icon.png",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "ivanray",
   "repository": {
     "type": "git",
@@ -21,11 +21,15 @@
   "activationEvents": [
     "onStartupFinished",
     "onLanguageModelChatProvider:kimi",
+    "onCommand:kimi-copilot.switchApiMode",
     "onCommand:kimi-copilot.setApiKey",
+    "onCommand:kimi-copilot.setKimiCodeApiKey",
     "onCommand:kimi-copilot.getApiKey",
     "onCommand:kimi-copilot.clearApiKey",
+    "onCommand:kimi-copilot.clearKimiCodeApiKey",
     "onCommand:kimi-copilot.openSettings",
     "onCommand:kimi-copilot.showLogs",
+    "onCommand:kimi-copilot.testConnection",
     "onCommand:kimi-copilot.openRequestDumpsFolder",
     "onCommand:kimi-copilot.refreshModels"
   ],
@@ -40,8 +44,16 @@
     ],
     "commands": [
       {
+        "command": "kimi-copilot.switchApiMode",
+        "title": "Kimi: Switch API Mode"
+      },
+      {
         "command": "kimi-copilot.setApiKey",
         "title": "Kimi: Set API Key"
+      },
+      {
+        "command": "kimi-copilot.setKimiCodeApiKey",
+        "title": "Kimi: Set Kimi Code API Key"
       },
       {
         "command": "kimi-copilot.getApiKey",
@@ -52,12 +64,20 @@
         "title": "Kimi: Clear API Key"
       },
       {
+        "command": "kimi-copilot.clearKimiCodeApiKey",
+        "title": "Kimi: Clear Kimi Code API Key"
+      },
+      {
         "command": "kimi-copilot.openSettings",
         "title": "Kimi: Open Settings"
       },
       {
         "command": "kimi-copilot.showLogs",
         "title": "Kimi: Show Logs"
+      },
+      {
+        "command": "kimi-copilot.testConnection",
+        "title": "Kimi: Test Connection"
       },
       {
         "command": "kimi-copilot.openRequestDumpsFolder",
@@ -71,10 +91,30 @@
     "configuration": {
       "title": "Kimi for Copilot Chat",
       "properties": {
+        "kimi-copilot.apiMode": {
+          "type": "string",
+          "default": "platform",
+          "enum": [
+            "platform",
+            "kimiCode",
+            "custom"
+          ],
+          "enumItemLabels": [
+            "Kimi Platform (Pay as you go)",
+            "Kimi Code Plan",
+            "Custom Base URL"
+          ],
+          "markdownEnumDescriptions": [
+            "Use the Kimi/Moonshot Open Platform endpoint `https://api.moonshot.ai/v1` with the regular Kimi API key.",
+            "Use the Kimi Code endpoint `https://api.kimi.com/coding/v1` with the separate Kimi Code API key and `kimi-for-coding` model.",
+            "Use `kimi-copilot.baseUrl` for compatible proxies or manually configured endpoints."
+          ],
+          "markdownDescription": "Select which Kimi-compatible API this extension should use. Existing pay-as-you-go keys are kept separate from Kimi Code keys."
+        },
         "kimi-copilot.baseUrl": {
           "type": "string",
           "default": "https://api.moonshot.ai/v1",
-          "description": "Base URL for the Kimi/Moonshot OpenAI-compatible API."
+          "description": "Base URL for Custom API Mode. Existing installs with a customized baseUrl and no apiMode setting continue to use the customized URL."
         },
         "kimi-copilot.maxTokens": {
           "type": "number",
@@ -90,6 +130,7 @@
         "kimi-copilot.modelIdOverrides": {
           "type": "object",
           "default": {
+            "kimi-for-coding": "kimi-for-coding",
             "kimi-k2.7-code": "kimi-k2.7-code",
             "kimi-k2.6": "kimi-k2.6",
             "kimi-k2.5": "kimi-k2.5",

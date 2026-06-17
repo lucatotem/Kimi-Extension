@@ -8,6 +8,7 @@ import type {
   KimiUsage,
   StreamHandlerOptions,
 } from "./types";
+import { formatFetchFailure } from "./httpDiagnostics";
 
 export async function streamChatCompletion(
   baseUrl: string,
@@ -18,16 +19,21 @@ export async function streamChatCompletion(
 ): Promise<void> {
   const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-    },
-    body: JSON.stringify(body),
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (error) {
+    throw new Error(formatFetchFailure(error, url, "Kimi chat request"));
+  }
 
   if (!response.ok || !response.body) {
     const errorText = await response.text().catch(() => "<unreadable>");

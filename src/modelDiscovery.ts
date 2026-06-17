@@ -3,6 +3,7 @@
 // https://platform.kimi.ai/docs/api/list-models
 
 import type { KimiModel, KimiModelsResponse } from "./types";
+import { formatFetchFailure } from "./httpDiagnostics";
 
 /**
  * Fetch the list of available Kimi models.
@@ -17,13 +18,18 @@ export async function fetchKimiModels(
 ): Promise<KimiModel[]> {
   const url = `${baseUrl.replace(/\/$/, "")}/models`;
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+  } catch (error) {
+    throw new Error(formatFetchFailure(error, url, "Kimi model discovery"));
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => "<unreadable>");

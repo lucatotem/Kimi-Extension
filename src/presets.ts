@@ -2,6 +2,7 @@
 // Model registry and discovery merge logic for Kimi Copilot.
 
 import type { KimiModel, KimiPreset } from "./types";
+import { KIMI_CODE_MODEL_ID } from "./endpoints";
 
 const K = 1024;
 const KIMI_CONTEXT = 256 * K;
@@ -9,6 +10,27 @@ const MOONSHOT_8K = 8 * K;
 const MOONSHOT_32K = 32 * K;
 const MOONSHOT_128K = 128 * K;
 const TOOL_LIMIT = 128;
+
+export const KIMI_CODE_PRESET: KimiPreset = {
+  presetId: KIMI_CODE_MODEL_ID,
+  displayName: "Kimi Code",
+  modelId: KIMI_CODE_MODEL_ID,
+  family: "kimi",
+  version: "coding",
+  detail: "Kimi Code plan model",
+  tooltip: "Kimi Code subscription model for coding agents. Uses the Kimi Code API endpoint.",
+  contextLength: KIMI_CONTEXT,
+  maxInputTokens: KIMI_CONTEXT,
+  maxOutputTokens: 32 * K,
+  capabilities: {
+    toolCalling: TOOL_LIMIT,
+    imageInput: true,
+    thinking: true,
+    canDisableThinking: false,
+    supportsPreservedThinking: true,
+    alwaysThinking: true,
+  },
+};
 
 export const KNOWN_KIMI_MODELS: KimiPreset[] = [
   {
@@ -79,8 +101,12 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
   moonshotModel("moonshot-v1-128k-vision-preview", "Moonshot V1 128K Vision", MOONSHOT_128K, true),
 ];
 
-export function mergeDiscoveredModels(discovered: KimiModel[] | undefined): KimiPreset[] {
-  const byId = new Map(KNOWN_KIMI_MODELS.map((model) => [model.modelId, model]));
+export function mergeDiscoveredModels(
+  discovered: KimiModel[] | undefined,
+  options?: { kimiCode?: boolean },
+): KimiPreset[] {
+  const bundled = options?.kimiCode ? [KIMI_CODE_PRESET] : KNOWN_KIMI_MODELS;
+  const byId = new Map(bundled.map((model) => [model.modelId, model]));
 
   for (const model of discovered ?? []) {
     if (!model.id || isDeprecatedModel(model.id)) {
@@ -105,7 +131,9 @@ export function mergeDiscoveredModels(discovered: KimiModel[] | undefined): Kimi
 }
 
 export function getKnownModelIdOverrides(): Record<string, string> {
-  return Object.fromEntries(KNOWN_KIMI_MODELS.map((model) => [model.presetId, model.modelId]));
+  return Object.fromEntries(
+    [KIMI_CODE_PRESET, ...KNOWN_KIMI_MODELS].map((model) => [model.presetId, model.modelId]),
+  );
 }
 
 export function supportsThinking(preset: KimiPreset): boolean {
@@ -185,6 +213,7 @@ function isDeprecatedModel(id: string): boolean {
 
 function sortRank(model: KimiPreset): number {
   const order = [
+    KIMI_CODE_MODEL_ID,
     "kimi-k2.7-code",
     "kimi-k2.6",
     "kimi-k2.5",

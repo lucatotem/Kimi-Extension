@@ -27,7 +27,7 @@ const TOOL_LIMIT = 128;
 const API_KEY_ENV_NAMES = ["KIMI_API_KEY", "MOONSHOT_API_KEY"];
 const KIMI_CODE_API_KEY_ENV_NAMES = ["KIMI_CODE_API_KEY"];
 
-type ReasoningEffort = "none" | "high" | "max";
+type ReasoningEffort = "none" | "low" | "high" | "max";
 type ApiMode = "platform" | "kimiCode" | "custom";
 
 export class KimiChatProvider implements vscode.LanguageModelChatProvider {
@@ -553,7 +553,11 @@ function extraModelInfo(preset: KimiPreset, hasApiKey: boolean): Record<string, 
 
 function buildThinkingSchema(preset: KimiPreset): object {
   const canDisable = preset.capabilities.canDisableThinking;
-  const values = canDisable ? ["none", "high", "max"] : ["high", "max"];
+  const values = preset.capabilities.supportsReasoningEffort
+    ? ["low", "high", "max"]
+    : canDisable
+      ? ["none", "high", "max"]
+      : ["high", "max"];
 
   return {
     properties: {
@@ -565,7 +569,7 @@ function buildThinkingSchema(preset: KimiPreset): object {
         enumDescriptions: values.map((value) =>
           descriptionForThinkingEffort(value as ReasoningEffort, preset),
         ),
-        default: "high",
+        default: preset.capabilities.supportsReasoningEffort ? "max" : "high",
         group: "navigation",
       },
     },
@@ -579,12 +583,18 @@ function labelForThinkingEffort(value: ReasoningEffort): string {
   if (value === "max") {
     return "Max";
   }
+  if (value === "low") {
+    return "Low";
+  }
   return "High";
 }
 
 function descriptionForThinkingEffort(value: ReasoningEffort, preset: KimiPreset): string {
   if (value === "none") {
     return "Disable Kimi thinking for faster replies when the model supports it.";
+  }
+  if (preset.capabilities.supportsReasoningEffort) {
+    return `Use Kimi's ${value} reasoning effort for this request.`;
   }
   if (value === "max" && preset.capabilities.supportsPreservedThinking) {
     return "Enable thinking and keep previous reasoning content across turns.";
@@ -609,10 +619,13 @@ function getConfiguredThinkingEffort(
   if (configured === "none" && preset.capabilities.canDisableThinking) {
     return "none";
   }
+  if (configured === "low" && preset.capabilities.supportsReasoningEffort) {
+    return "low";
+  }
   if (configured === "max") {
     return "max";
   }
-  return "high";
+  return preset.capabilities.supportsReasoningEffort ? "max" : "high";
 }
 
 function applyThinkingConfig(
@@ -620,6 +633,11 @@ function applyThinkingConfig(
   preset: KimiPreset,
   effort: ReasoningEffort,
 ): void {
+  if (preset.capabilities.supportsReasoningEffort) {
+    request.reasoning_effort = effort === "none" ? "max" : effort;
+    return;
+  }
+
   if (!preset.capabilities.thinking || preset.capabilities.alwaysThinking) {
     return;
   }

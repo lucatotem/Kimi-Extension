@@ -47,6 +47,7 @@ export interface KimiCapabilities {
   thinking: boolean;
   canDisableThinking: boolean;
   supportsPreservedThinking: boolean;
+  supportsReasoningEffort: boolean;
   alwaysThinking: boolean;
 }
 
@@ -130,6 +131,7 @@ export interface KimiChatRequest {
     type: "enabled" | "disabled";
     keep?: "all";
   };
+  reasoning_effort?: "low" | "high" | "max";
 }
 
 /** Options passed to the SSE stream parser. */

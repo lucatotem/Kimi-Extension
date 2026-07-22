@@ -6,6 +6,7 @@ import { KIMI_CODE_MODEL_ID } from "./endpoints";
 
 const K = 1024;
 const KIMI_CONTEXT = 256 * K;
+const KIMI_K3_CONTEXT = 1024 * K;
 const MOONSHOT_8K = 8 * K;
 const MOONSHOT_32K = 32 * K;
 const MOONSHOT_128K = 128 * K;
@@ -28,11 +29,33 @@ export const KIMI_CODE_PRESET: KimiPreset = {
     thinking: true,
     canDisableThinking: false,
     supportsPreservedThinking: true,
+    supportsReasoningEffort: false,
     alwaysThinking: true,
   },
 };
 
 export const KNOWN_KIMI_MODELS: KimiPreset[] = [
+  {
+    presetId: "kimi-k3",
+    displayName: "Kimi K3",
+    modelId: "kimi-k3",
+    family: "kimi",
+    version: "k3",
+    detail: "Flagship model with 1M context and vision",
+    tooltip: "Kimi's flagship model for software engineering, knowledge work, deep reasoning, and visual understanding.",
+    contextLength: KIMI_K3_CONTEXT,
+    maxInputTokens: KIMI_K3_CONTEXT,
+    maxOutputTokens: KIMI_K3_CONTEXT,
+    capabilities: {
+      toolCalling: TOOL_LIMIT,
+      imageInput: true,
+      thinking: true,
+      canDisableThinking: false,
+      supportsPreservedThinking: true,
+      supportsReasoningEffort: true,
+      alwaysThinking: true,
+    },
+  },
   {
     presetId: "kimi-k2.7-code",
     displayName: "Kimi K2.7 Code",
@@ -50,6 +73,28 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
       thinking: true,
       canDisableThinking: false,
       supportsPreservedThinking: true,
+      supportsReasoningEffort: false,
+      alwaysThinking: true,
+    },
+  },
+  {
+    presetId: "kimi-k2.7-code-highspeed",
+    displayName: "Kimi K2.7 Code High-Speed",
+    modelId: "kimi-k2.7-code-highspeed",
+    family: "kimi",
+    version: "k2.7-code-highspeed",
+    detail: "High-speed code model, always-thinking",
+    tooltip: "High-speed Kimi K2.7 Code variant for coding and agent tasks.",
+    contextLength: KIMI_CONTEXT,
+    maxInputTokens: KIMI_CONTEXT,
+    maxOutputTokens: KIMI_CONTEXT,
+    capabilities: {
+      toolCalling: TOOL_LIMIT,
+      imageInput: true,
+      thinking: true,
+      canDisableThinking: false,
+      supportsPreservedThinking: true,
+      supportsReasoningEffort: false,
       alwaysThinking: true,
     },
   },
@@ -70,6 +115,7 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
       thinking: true,
       canDisableThinking: true,
       supportsPreservedThinking: true,
+      supportsReasoningEffort: false,
       alwaysThinking: false,
     },
   },
@@ -90,6 +136,7 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
       thinking: true,
       canDisableThinking: true,
       supportsPreservedThinking: false,
+      supportsReasoningEffort: false,
       alwaysThinking: false,
     },
   },
@@ -160,6 +207,7 @@ function moonshotModel(id: string, name: string, contextLength: number, vision: 
       thinking: false,
       canDisableThinking: false,
       supportsPreservedThinking: false,
+      supportsReasoningEffort: false,
       alwaysThinking: false,
     },
   };
@@ -168,8 +216,10 @@ function moonshotModel(id: string, name: string, contextLength: number, vision: 
 function presetFromUnknownModel(model: KimiModel): KimiPreset {
   const id = model.id;
   const contextLength = model.context_length ?? KIMI_CONTEXT;
-  const reasoning = Boolean(model.supports_reasoning) || /k2|thinking|reason/i.test(id);
-  const imageInput = Boolean(model.supports_image_in || model.supports_video_in || /vision|k2/i.test(id));
+  const isK3 = /^kimi-k3(?:$|-)/i.test(id);
+  const isK27Code = /k2\.7-code/i.test(id);
+  const reasoning = Boolean(model.supports_reasoning) || /k[23]|thinking|reason/i.test(id);
+  const imageInput = Boolean(model.supports_image_in || model.supports_video_in || /vision|k[23]/i.test(id));
 
   return {
     presetId: id,
@@ -186,9 +236,10 @@ function presetFromUnknownModel(model: KimiModel): KimiPreset {
       toolCalling: reasoning ? TOOL_LIMIT : false,
       imageInput,
       thinking: reasoning,
-      canDisableThinking: reasoning && !/k2\.7-code/i.test(id),
-      supportsPreservedThinking: /k2\.6|k2\.7-code/i.test(id),
-      alwaysThinking: /k2\.7-code/i.test(id),
+      canDisableThinking: reasoning && !isK27Code && !isK3,
+      supportsPreservedThinking: /k2\.6|k2\.7-code/i.test(id) || isK3,
+      supportsReasoningEffort: isK3,
+      alwaysThinking: isK27Code || isK3,
     },
   };
 }
@@ -214,7 +265,9 @@ function isDeprecatedModel(id: string): boolean {
 function sortRank(model: KimiPreset): number {
   const order = [
     KIMI_CODE_MODEL_ID,
+    "kimi-k3",
     "kimi-k2.7-code",
+    "kimi-k2.7-code-highspeed",
     "kimi-k2.6",
     "kimi-k2.5",
     "moonshot-v1-128k-vision-preview",

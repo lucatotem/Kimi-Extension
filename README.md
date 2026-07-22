@@ -25,11 +25,15 @@ The bundled picker entries are based on the current Kimi model list:
 | Model | Use for |
 | --- | --- |
 | Kimi Code | Kimi Code subscription/coding-plan users. Uses `kimi-for-coding`. |
+| Kimi K3 | Flagship model for software engineering, knowledge work, deep reasoning, and vision. Supports 1M context and configurable reasoning effort. |
 | Kimi K2.7 Code | Coding and agent tasks. Thinking is always on. |
+| Kimi K2.7 Code High-Speed | Same coding model and 256K context, served at higher output speed. |
 | Kimi K2.6 | General coding, agent tasks, text, image, and video. Thinking can be turned off. |
 | Kimi K2.5 | Previous K2 model with thinking and multimodal input. |
 | Moonshot V1 8K / 32K / 128K | Text generation at different context lengths. |
 | Moonshot V1 Vision 8K / 32K / 128K | Image understanding with text output. |
+
+Kimi K2.5 and the Moonshot V1 series remain available to existing accounts, but Kimi has stopped enabling them for newly registered users and plans a platform-wide sunset on August 31, 2026.
 
 When an API key is configured, the extension can also merge models returned by `GET /v1/models`.
 
@@ -64,10 +68,11 @@ The Copilot model picker shows a Thinking control where Kimi supports it:
 | Value | Kimi request |
 | --- | --- |
 | None | `thinking: { "type": "disabled" }` on K2.6/K2.5 |
-| High | `thinking: { "type": "enabled" }` |
-| Max | Enables thinking and uses `keep: "all"` where Kimi supports preserved thinking |
+| Low | `reasoning_effort: "low"` on K3 |
+| High | Uses `reasoning_effort: "high"` on K3; otherwise sends `thinking: { "type": "enabled" }` |
+| Max | Uses `reasoning_effort: "max"` on K3; otherwise enables thinking and uses `keep: "all"` where supported |
 
-Kimi K2.7 Code cannot disable thinking, so the picker only offers supported values for that model.
+Kimi K3 always thinks and accepts `low`, `high`, or `max` reasoning effort. Kimi K2.7 Code and its High-Speed variant also cannot disable thinking.
 
 ## Commands
 

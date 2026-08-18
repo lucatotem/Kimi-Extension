@@ -373,7 +373,7 @@ export class KimiChatProvider implements vscode.LanguageModelChatProvider {
       }
     }
 
-    this.presets = mergeDiscoveredModels(discovered, { kimiCode });
+    this.presets = mergeDiscoveredModels(discovered);
     return this.presets;
   }
 

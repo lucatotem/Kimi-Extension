@@ -150,9 +150,11 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
 
 export function mergeDiscoveredModels(
   discovered: KimiModel[] | undefined,
-  options?: { kimiCode?: boolean },
 ): KimiPreset[] {
-  const bundled = options?.kimiCode ? [KIMI_CODE_PRESET] : KNOWN_KIMI_MODELS;
+  // Every bundled model is selectable in every API mode. The Kimi Code preset
+  // keeps sending kimi-for-coding by default; users can remap any picker entry
+  // through the kimi-copilot.modelIdOverrides setting.
+  const bundled = [KIMI_CODE_PRESET, ...KNOWN_KIMI_MODELS];
   const byId = new Map(bundled.map((model) => [model.modelId, model]));
 
   for (const model of discovered ?? []) {

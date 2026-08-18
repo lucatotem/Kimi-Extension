@@ -4,6 +4,7 @@
 export const DEFAULT_BASE_URL = "https://api.moonshot.ai/v1";
 export const KIMI_CODE_BASE_URL = "https://api.kimi.com/coding/v1";
 export const KIMI_CODE_MODEL_ID = "kimi-for-coding";
+export const CLIENT_USER_AGENT = "kimi-copilot-presets-vscode";
 
 export function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, "");

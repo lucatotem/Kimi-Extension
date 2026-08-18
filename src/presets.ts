@@ -12,27 +12,7 @@ const MOONSHOT_32K = 32 * K;
 const MOONSHOT_128K = 128 * K;
 const TOOL_LIMIT = 128;
 
-export const KIMI_CODE_PRESET: KimiPreset = {
-  presetId: KIMI_CODE_MODEL_ID,
-  displayName: "Kimi Code",
-  modelId: KIMI_CODE_MODEL_ID,
-  family: "kimi",
-  version: "coding",
-  detail: "Kimi Code plan model",
-  tooltip: "Kimi Code subscription model for coding agents. Uses the Kimi Code API endpoint.",
-  contextLength: KIMI_CONTEXT,
-  maxInputTokens: KIMI_CONTEXT,
-  maxOutputTokens: 32 * K,
-  capabilities: {
-    toolCalling: TOOL_LIMIT,
-    imageInput: true,
-    thinking: true,
-    canDisableThinking: false,
-    supportsPreservedThinking: true,
-    supportsReasoningEffort: false,
-    alwaysThinking: true,
-  },
-};
+export type KimiModelCatalog = "platform" | "kimiCode" | "custom";
 
 export const KNOWN_KIMI_MODELS: KimiPreset[] = [
   {
@@ -54,6 +34,7 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
       supportsPreservedThinking: true,
       supportsReasoningEffort: true,
       alwaysThinking: true,
+      defaultReasoningEffort: "max",
     },
   },
   {
@@ -148,11 +129,100 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
   moonshotModel("moonshot-v1-128k-vision-preview", "Moonshot V1 128K Vision", MOONSHOT_128K, true),
 ];
 
+export const KIMI_CODE_MODELS: KimiPreset[] = [
+  {
+    presetId: "k3",
+    displayName: "Kimi K3",
+    modelId: "k3",
+    family: "kimi",
+    version: "k3-code",
+    detail: "Kimi Code K3 with up to 1M context",
+    tooltip: "Kimi K3 through the Kimi Code plan. Requires Moderato or above; 1M context requires Allegretto or above.",
+    contextLength: KIMI_K3_CONTEXT,
+    maxInputTokens: KIMI_K3_CONTEXT,
+    maxOutputTokens: KIMI_K3_CONTEXT,
+    capabilities: {
+      toolCalling: TOOL_LIMIT,
+      imageInput: true,
+      thinking: true,
+      canDisableThinking: false,
+      supportsPreservedThinking: true,
+      supportsReasoningEffort: true,
+      alwaysThinking: true,
+      defaultReasoningEffort: "high",
+    },
+  },
+  {
+    presetId: "k3-256k",
+    displayName: "Kimi K3 256K",
+    modelId: "k3-256k",
+    family: "kimi",
+    version: "k3-256k-code",
+    detail: "Kimi Code K3 with a fixed 256K context",
+    tooltip: "Kimi K3 256K through the Kimi Code plan. Requires Moderato or above and does not support video input.",
+    contextLength: KIMI_CONTEXT,
+    maxInputTokens: KIMI_CONTEXT,
+    maxOutputTokens: KIMI_CONTEXT,
+    capabilities: {
+      toolCalling: TOOL_LIMIT,
+      imageInput: true,
+      thinking: true,
+      canDisableThinking: false,
+      supportsPreservedThinking: true,
+      supportsReasoningEffort: true,
+      alwaysThinking: true,
+      defaultReasoningEffort: "high",
+    },
+  },
+  {
+    presetId: KIMI_CODE_MODEL_ID,
+    displayName: "Kimi K2.7 Code",
+    modelId: KIMI_CODE_MODEL_ID,
+    family: "kimi",
+    version: "k2.7-code-plan",
+    detail: "Kimi Code standard-speed model",
+    tooltip: "Kimi K2.7 Code through the Kimi Code plan. Available to all membership tiers.",
+    contextLength: KIMI_CONTEXT,
+    maxInputTokens: KIMI_CONTEXT,
+    maxOutputTokens: 32 * K,
+    capabilities: {
+      toolCalling: TOOL_LIMIT,
+      imageInput: true,
+      thinking: true,
+      canDisableThinking: false,
+      supportsPreservedThinking: true,
+      supportsReasoningEffort: false,
+      alwaysThinking: true,
+    },
+  },
+  {
+    presetId: "kimi-for-coding-highspeed",
+    displayName: "Kimi K2.7 Code High-Speed",
+    modelId: "kimi-for-coding-highspeed",
+    family: "kimi",
+    version: "k2.7-code-highspeed-plan",
+    detail: "Kimi Code high-speed model",
+    tooltip: "High-speed Kimi K2.7 Code through the Kimi Code plan. Requires Allegretto or above.",
+    contextLength: KIMI_CONTEXT,
+    maxInputTokens: KIMI_CONTEXT,
+    maxOutputTokens: 32 * K,
+    capabilities: {
+      toolCalling: TOOL_LIMIT,
+      imageInput: true,
+      thinking: true,
+      canDisableThinking: false,
+      supportsPreservedThinking: true,
+      supportsReasoningEffort: false,
+      alwaysThinking: true,
+    },
+  },
+];
+
 export function mergeDiscoveredModels(
   discovered: KimiModel[] | undefined,
-  options?: { kimiCode?: boolean },
+  catalog: KimiModelCatalog,
 ): KimiPreset[] {
-  const bundled = options?.kimiCode ? [KIMI_CODE_PRESET] : KNOWN_KIMI_MODELS;
+  const bundled = bundledModels(catalog);
   const byId = new Map(bundled.map((model) => [model.modelId, model]));
 
   for (const model of discovered ?? []) {
@@ -166,12 +236,11 @@ export function mergeDiscoveredModels(
         ...known,
         contextLength: model.context_length ?? known.contextLength,
         maxInputTokens: model.context_length ?? known.maxInputTokens,
-        maxOutputTokens: model.context_length ?? known.maxOutputTokens,
       });
       continue;
     }
 
-    byId.set(model.id, presetFromUnknownModel(model));
+    byId.set(model.id, presetFromUnknownModel(model, catalog));
   }
 
   return Array.from(byId.values()).sort((a, b) => sortRank(a) - sortRank(b) || a.displayName.localeCompare(b.displayName));
@@ -179,7 +248,7 @@ export function mergeDiscoveredModels(
 
 export function getKnownModelIdOverrides(): Record<string, string> {
   return Object.fromEntries(
-    [KIMI_CODE_PRESET, ...KNOWN_KIMI_MODELS].map((model) => [model.presetId, model.modelId]),
+    [...KNOWN_KIMI_MODELS, ...KIMI_CODE_MODELS].map((model) => [model.presetId, model.modelId]),
   );
 }
 
@@ -213,11 +282,21 @@ function moonshotModel(id: string, name: string, contextLength: number, vision: 
   };
 }
 
-function presetFromUnknownModel(model: KimiModel): KimiPreset {
+function bundledModels(catalog: KimiModelCatalog): KimiPreset[] {
+  if (catalog === "platform") {
+    return KNOWN_KIMI_MODELS;
+  }
+  if (catalog === "kimiCode") {
+    return KIMI_CODE_MODELS;
+  }
+  return [...KNOWN_KIMI_MODELS, ...KIMI_CODE_MODELS];
+}
+
+function presetFromUnknownModel(model: KimiModel, catalog: KimiModelCatalog): KimiPreset {
   const id = model.id;
   const contextLength = model.context_length ?? KIMI_CONTEXT;
-  const isK3 = /^kimi-k3(?:$|-)/i.test(id);
-  const isK27Code = /k2\.7-code/i.test(id);
+  const isK3 = /^(?:kimi-)?k3(?:$|-)/i.test(id);
+  const isK27Code = /k2\.7-code|kimi-for-coding/i.test(id);
   const reasoning = Boolean(model.supports_reasoning) || /k[23]|thinking|reason/i.test(id);
   const imageInput = Boolean(model.supports_image_in || model.supports_video_in || /vision|k[23]/i.test(id));
 
@@ -240,6 +319,7 @@ function presetFromUnknownModel(model: KimiModel): KimiPreset {
       supportsPreservedThinking: /k2\.6|k2\.7-code/i.test(id) || isK3,
       supportsReasoningEffort: isK3,
       alwaysThinking: isK27Code || isK3,
+      defaultReasoningEffort: isK3 ? (catalog === "platform" ? "max" : "high") : undefined,
     },
   };
 }
@@ -264,10 +344,13 @@ function isDeprecatedModel(id: string): boolean {
 
 function sortRank(model: KimiPreset): number {
   const order = [
-    KIMI_CODE_MODEL_ID,
     "kimi-k3",
+    "k3",
+    "k3-256k",
     "kimi-k2.7-code",
+    KIMI_CODE_MODEL_ID,
     "kimi-k2.7-code-highspeed",
+    "kimi-for-coding-highspeed",
     "kimi-k2.6",
     "kimi-k2.5",
     "moonshot-v1-128k-vision-preview",

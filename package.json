@@ -106,7 +106,7 @@
           ],
           "markdownEnumDescriptions": [
             "Use the Kimi/Moonshot Open Platform endpoint `https://api.moonshot.ai/v1` with the regular Kimi API key.",
-            "Use the Kimi Code endpoint `https://api.kimi.com/coding/v1` with the separate Kimi Code API key and `kimi-for-coding` model.",
+            "Use the Kimi Code endpoint `https://api.kimi.com/coding/v1` with its separate API key and supported K3 or K2.7 Code model IDs.",
             "Use `kimi-copilot.baseUrl` for compatible proxies or manually configured endpoints."
           ],
           "markdownDescription": "Select which Kimi-compatible API this extension should use. Existing pay-as-you-go keys are kept separate from Kimi Code keys."
@@ -130,6 +130,9 @@
         "kimi-copilot.modelIdOverrides": {
           "type": "object",
           "default": {
+            "k3": "k3",
+            "k3-256k": "k3-256k",
+            "kimi-for-coding-highspeed": "kimi-for-coding-highspeed",
             "kimi-for-coding": "kimi-for-coding",
             "kimi-k3": "kimi-k3",
             "kimi-k2.7-code": "kimi-k2.7-code",
@@ -143,7 +146,7 @@
             "moonshot-v1-32k-vision-preview": "moonshot-v1-32k-vision-preview",
             "moonshot-v1-128k-vision-preview": "moonshot-v1-128k-vision-preview"
           },
-          "description": "API model IDs to send for each Kimi picker entry. Change this for compatible proxies with different model names.",
+          "description": "API model IDs to send for picker entries in the active endpoint catalog. Change these for compatible proxies with different model names.",
           "additionalProperties": {
             "type": "string"
           }
@@ -174,6 +177,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "test": "npm run compile && node --test test/*.test.js",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts"
   },

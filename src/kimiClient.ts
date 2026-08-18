@@ -8,6 +8,7 @@ import type {
   KimiUsage,
   StreamHandlerOptions,
 } from "./types";
+import { CLIENT_USER_AGENT } from "./endpoints";
 import { formatFetchFailure } from "./httpDiagnostics";
 
 export async function streamChatCompletion(
@@ -27,6 +28,7 @@ export async function streamChatCompletion(
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         Accept: "text/event-stream",
+        "User-Agent": CLIENT_USER_AGENT,
       },
       body: JSON.stringify(body),
       signal,

@@ -5,7 +5,6 @@ import * as vscode from "vscode";
 import {
   DEFAULT_BASE_URL,
   KIMI_CODE_BASE_URL,
-  KIMI_CODE_MODEL_ID,
   isKimiCodeBaseUrl,
   normalizeBaseUrl,
 } from "./endpoints";
@@ -291,7 +290,7 @@ export class KimiChatProvider implements vscode.LanguageModelChatProvider {
     }
 
     const request: KimiChatRequest = {
-      model: getApiModelId(preset.presetId, preset.modelId, baseUrl),
+      model: getApiModelId(preset.presetId, preset.modelId),
       messages: kimiMessages,
       stream: true,
       tools,
@@ -358,10 +357,9 @@ export class KimiChatProvider implements vscode.LanguageModelChatProvider {
 
     let discovered = undefined;
     const baseUrl = getBaseUrl();
-    const kimiCode = usesKimiCodeApi(baseUrl);
     const apiKey = await this.getApiKey({ silent: true, baseUrl });
 
-    if (apiKey && getEnableModelDiscovery() && !kimiCode) {
+    if (apiKey && getEnableModelDiscovery()) {
       try {
         discovered = await fetchKimiModels(baseUrl, apiKey);
       } catch (error) {
@@ -724,7 +722,7 @@ function getDebugMode(): "minimal" | "metadata" | "verbose" {
   return value === "metadata" || value === "verbose" ? value : "minimal";
 }
 
-function getApiModelId(vscodeModelId: string, defaultModelId: string, baseUrl: string): string {
+function getApiModelId(vscodeModelId: string, defaultModelId: string): string {
   const overrides = getConfigValue<Record<string, string>>(
     "modelIdOverrides",
     getKnownModelIdOverrides(),
@@ -734,7 +732,10 @@ function getApiModelId(vscodeModelId: string, defaultModelId: string, baseUrl: s
     return override;
   }
 
-  return usesKimiCodeApi(baseUrl) ? KIMI_CODE_MODEL_ID : defaultModelId;
+  // Send the picked model ID as-is in every mode. The Kimi Code preset
+  // defaults to kimi-for-coding, so the coding endpoint still receives its
+  // expected model unless the user remaps it with modelIdOverrides.
+  return defaultModelId;
 }
 
 function getConfigValue<T>(key: string, defaultValue: T): T {

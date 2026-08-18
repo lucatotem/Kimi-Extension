@@ -3,6 +3,7 @@
 // https://platform.kimi.ai/docs/api/list-models
 
 import type { KimiModel, KimiModelsResponse } from "./types";
+import { CLIENT_USER_AGENT } from "./endpoints";
 import { formatFetchFailure } from "./httpDiagnostics";
 
 /**
@@ -25,6 +26,7 @@ export async function fetchKimiModels(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "User-Agent": CLIENT_USER_AGENT,
       },
     });
   } catch (error) {

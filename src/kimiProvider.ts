@@ -3,6 +3,7 @@
 
 import * as vscode from "vscode";
 import {
+  CLIENT_USER_AGENT,
   DEFAULT_BASE_URL,
   KIMI_CODE_BASE_URL,
   isKimiCodeBaseUrl,
@@ -13,7 +14,12 @@ import { fetchKimiModels } from "./modelDiscovery";
 import { convertMessages, convertTools, countMessageChars } from "./messageConverter";
 import { streamChatCompletion } from "./kimiClient";
 import { estimateTokenCount } from "./tokenCounter";
-import { getKnownModelIdOverrides, mergeDiscoveredModels, supportsThinking } from "./presets";
+import {
+  getKnownModelIdOverrides,
+  mergeDiscoveredModels,
+  supportsThinking,
+  type KimiModelCatalog,
+} from "./presets";
 import type { KimiChatRequest, KimiPreset, KimiUsage } from "./types";
 
 const CONFIG_SECTION = "kimi-copilot";
@@ -200,6 +206,7 @@ export class KimiChatProvider implements vscode.LanguageModelChatProvider {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "User-Agent": CLIENT_USER_AGENT,
         },
       });
       const body = await response.text().catch(() => "<unreadable>");
@@ -371,7 +378,7 @@ export class KimiChatProvider implements vscode.LanguageModelChatProvider {
       }
     }
 
-    this.presets = mergeDiscoveredModels(discovered);
+    this.presets = mergeDiscoveredModels(discovered, getModelCatalog(baseUrl));
     return this.presets;
   }
 
@@ -397,7 +404,7 @@ export class KimiChatProvider implements vscode.LanguageModelChatProvider {
         return envCodeKey;
       }
 
-      return this.getGeneralApiKey();
+      return undefined;
     }
 
     return this.getGeneralApiKey();
@@ -567,7 +574,7 @@ function buildThinkingSchema(preset: KimiPreset): object {
         enumDescriptions: values.map((value) =>
           descriptionForThinkingEffort(value as ReasoningEffort, preset),
         ),
-        default: preset.capabilities.supportsReasoningEffort ? "max" : "high",
+        default: preset.capabilities.defaultReasoningEffort ?? "high",
         group: "navigation",
       },
     },
@@ -620,10 +627,13 @@ function getConfiguredThinkingEffort(
   if (configured === "low" && preset.capabilities.supportsReasoningEffort) {
     return "low";
   }
+  if (configured === "high") {
+    return "high";
+  }
   if (configured === "max") {
     return "max";
   }
-  return preset.capabilities.supportsReasoningEffort ? "max" : "high";
+  return preset.capabilities.defaultReasoningEffort ?? "high";
 }
 
 function applyThinkingConfig(
@@ -732,9 +742,8 @@ function getApiModelId(vscodeModelId: string, defaultModelId: string): string {
     return override;
   }
 
-  // Send the picked model ID as-is in every mode. The Kimi Code preset
-  // defaults to kimi-for-coding, so the coding endpoint still receives its
-  // expected model unless the user remaps it with modelIdOverrides.
+  // Bundled presets use the native ID for their active endpoint. Overrides
+  // remain useful for custom proxies and explicit user remapping.
   return defaultModelId;
 }
 
@@ -788,6 +797,14 @@ function getConfiguredBaseUrl(): string {
 
 function usesKimiCodeApi(baseUrl: string): boolean {
   return getApiMode() === "kimiCode" || isKimiCodeBaseUrl(baseUrl);
+}
+
+function getModelCatalog(baseUrl: string): KimiModelCatalog {
+  const mode = getApiMode();
+  if (mode === "kimiCode" || isKimiCodeBaseUrl(baseUrl)) {
+    return "kimiCode";
+  }
+  return mode === "platform" ? "platform" : "custom";
 }
 
 function modeLabel(mode: ApiMode): string {

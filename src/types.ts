@@ -49,6 +49,7 @@ export interface KimiCapabilities {
   supportsPreservedThinking: boolean;
   supportsReasoningEffort: boolean;
   alwaysThinking: boolean;
+  defaultReasoningEffort?: "low" | "high" | "max";
 }
 
 /** A model entry exposed to VS Code. */

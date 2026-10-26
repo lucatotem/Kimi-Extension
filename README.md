@@ -1,6 +1,6 @@
 # Kimi for Copilot Chat
 
-Use Kimi and Moonshot models from the normal Copilot Chat model picker.
+Use Kimi models from the normal Copilot Chat model picker.
 
 This extension is a BYOK provider. It does not add a second chat sidebar or a local proxy. Pick a Kimi model in Copilot Chat and keep using Copilot's agent mode, tools, instructions, and MCP setup.
 
@@ -23,32 +23,39 @@ Repository: https://github.com/lucatotem/Kimi-Extension
 
 The picker follows the catalog of the active endpoint. Equivalent models use different API IDs on the two services, so the extension keeps the catalogs separate and sends the native ID shown below.
 
+Catalog verified on October 26, 2026 against the official [Platform model list](https://platform.kimi.ai/docs/models), [parameter reference](https://platform.kimi.ai/docs/api/models-overview), and [Kimi Code model configuration](https://www.kimi.com/code/docs/en/kimi-code/models.html).
+
 ### Kimi Platform
 
 | Model | API ID | Use for |
 | --- | --- | --- |
-| Kimi K3 | `kimi-k3` | Software engineering, knowledge work, deep reasoning, vision, and up to 1M context. |
+| Kimi K3.1 Pro | `kimi-k3.1-pro` | Latest flagship with vision, tools, adjustable reasoning, and 1M context. |
+| Kimi K3.1 Pro Highspeed | `kimi-k3.1-pro-highspeed` | The same capabilities with faster output. |
+| Kimi K3 | `kimi-k3` | Previous flagship with vision, adjustable reasoning, and 1M context. |
 | Kimi K2.7 Code | `kimi-k2.7-code` | Coding and agent tasks with thinking always on. |
 | Kimi K2.7 Code High-Speed | `kimi-k2.7-code-highspeed` | The K2.7 coding model at higher output speed. |
 | Kimi K2.6 | `kimi-k2.6` | General coding, agent, text, image, and video tasks with optional thinking. |
-| Kimi K2.5 | `kimi-k2.5` | Previous multimodal K2 model with optional thinking. |
-| Moonshot V1 8K / 32K / 128K | `moonshot-v1-*` | Text generation at different context lengths. |
-| Moonshot V1 Vision 8K / 32K / 128K | `moonshot-v1-*-vision-preview` | Image understanding with text output. |
 
-Kimi K2.5 and the Moonshot V1 series remain available to existing accounts, but Kimi has stopped enabling them for newly registered users and plans a platform-wide sunset on August 31, 2026.
+Kimi K2.5 and every Moonshot V1 variant were retired on August 31, 2026 and are excluded from the bundled picker and official discovery results. Older K2 preview/thinking models, `kimi-latest`, and `kimi-thinking-preview` are also excluded.
+
+Platform K2.6 and K2.7 Code models are still available, so they remain selectable and are labeled with their planned December 2026 retirement. Kimi says these models will stop being enabled for newly registered users on October 31, 2026 and are planned to retire by the end of December. Use K3.1 Pro for new integrations.
 
 ### Kimi Code Plan
 
 | Model | API ID | Availability |
 | --- | --- | --- |
-| Kimi K3 | `k3` | Moderato and above; up to 1M context requires Allegretto or above. |
-| Kimi K3 256K | `k3-256k` | Moderato and above; fixed 256K context and no video input. |
-| Kimi K2.7 Code | `kimi-for-coding` | All membership tiers. |
-| Kimi K2.7 Code High-Speed | `kimi-for-coding-highspeed` | Allegretto and above. |
+| Kimi K3.1 Pro | `k3.1-pro` | Plus / Moderato and above; 1M context requires Pro / Allegretto and above. |
+| Kimi K3.1 Pro Highspeed | `k3.1-pro-highspeed` | Pro / Allegretto and above; up to 1M context. |
+| Kimi K3 | `k3` | Plus / Moderato and above; 1M context requires Pro / Allegretto and above. |
+| Kimi K3 256K | `k3-256k` | Plus / Moderato and above; fixed 256K context and no video input. |
+| Kimi K2.8 Preview | `kimi-for-coding` | Plus and above on new plans, Andante and above on legacy plans; up to 1M context. |
+| Kimi K2.7 Code High-Speed | `kimi-for-coding-highspeed` | Pro / Allegretto and above; 256K context. |
+
+`kimi-for-coding` now serves **K2.8 Preview**, replacing K2.7 Code without changing the API ID. It supports `low`, `high`, and `max` reasoning effort, with `max` as the default. Go plans do not include coding quota.
 
 Kimi Code does not expose K2.6, K2.5, or Moonshot V1 as selectable API models. Kimi Platform does not expose the `kimi-for-coding` aliases. The extension therefore shows every documented model available on the active service rather than offering entries that the endpoint will reject.
 
-When an API key is configured, the extension also merges models returned by the active endpoint's `GET /v1/models` response. This allows newly released models to appear without an extension update.
+When an API key is configured, the extension also merges models returned by the active endpoint's `GET /v1/models` response. This allows newly released models to appear without an extension update. Discovery updates account-specific context limits when provided; bundled limits represent the maximum supported context and do not grant plan access. Custom proxies can still expose older models through discovery if they host them themselves.
 
 ## API Modes
 
@@ -57,10 +64,12 @@ Use `Kimi: Switch API Mode` or the `kimi-copilot.apiMode` setting to choose the 
 | Mode | Endpoint | Key command | Notes |
 | --- | --- | --- | --- |
 | Kimi Platform (Pay as you go) | `https://api.moonshot.ai/v1` | `Kimi: Set API Key` | Default mode for existing pay-as-you-go API keys. |
-| Kimi Code Plan | `https://api.kimi.com/coding/v1` | `Kimi: Set Kimi Code API Key` | Offers the four documented Kimi Code model IDs and uses a separate subscription key. |
+| Kimi Code Plan | `https://api.kimi.com/coding/v1` | `Kimi: Set Kimi Code API Key` | Offers the six documented Kimi Code model IDs and uses a separate subscription key. |
 | Custom Base URL | `kimi-copilot.baseUrl` | `Kimi: Set API Key` | For OpenAI-compatible proxies or manually configured endpoints. |
 
 Switching modes does not delete stored keys. The regular pay-as-you-go key is stored separately from the Kimi Code key, so users can move between modes without re-entering the other key.
+
+To use the overseas Kimi Code endpoint, choose Custom Base URL and set `kimi-copilot.baseUrl` to `https://api.kimi.ai/coding/v1`. Both official Code domains use the Kimi Code catalog and its separate key. A URL ending in `/coding` is normalized to `/coding/v1`.
 
 To use a Kimi Code subscription plan:
 
@@ -68,7 +77,7 @@ To use a Kimi Code subscription plan:
 2. Choose `Kimi Code Plan`.
 3. Run `Kimi: Set Kimi Code API Key`.
 4. Run `Kimi: Refresh Models` or reload VS Code.
-5. Pick K3, K3 256K, K2.7 Code, or K2.7 Code High-Speed according to your membership tier.
+5. Pick K3.1 Pro, K3.1 Pro Highspeed, K3, K3 256K, K2.8 Preview, or K2.7 Code High-Speed according to your membership tier.
 
 To use the pay-as-you-go Kimi Platform:
 
@@ -76,7 +85,7 @@ To use the pay-as-you-go Kimi Platform:
 2. Choose `Kimi Platform (Pay as you go)`.
 3. Run `Kimi: Set API Key`.
 4. Run `Kimi: Refresh Models` or reload VS Code.
-5. Pick any model, for example `Kimi K3`, from the Copilot Chat model picker.
+5. Pick a model, for example `Kimi K3.1 Pro`, from the Copilot Chat model picker.
 
 ### Using both plans together
 
@@ -98,12 +107,14 @@ The Copilot model picker shows a Thinking control where Kimi supports it:
 
 | Value | Kimi request |
 | --- | --- |
-| None | `thinking: { "type": "disabled" }` on K2.6/K2.5 |
-| Low | `reasoning_effort: "low"` on K3 |
-| High | Uses `reasoning_effort: "high"` on K3; otherwise sends `thinking: { "type": "enabled" }` |
-| Max | Uses `reasoning_effort: "max"` on K3; otherwise enables thinking and uses `keep: "all"` where supported |
+| None | `thinking: { "type": "disabled" }` on Platform K2.6 and supported Code models. Code K3 / K3 256K / K2.7 High-Speed route to K2.8 Preview without thinking. |
+| Low | `reasoning_effort: "low"` on K3.1 Pro, K3, and Code K2.8 Preview. |
+| High | `reasoning_effort: "high"` where supported; otherwise enables thinking where configurable. |
+| Max | `reasoning_effort: "max"` where supported; otherwise enables preserved thinking where configurable. |
 
-Kimi K3 always thinks and accepts `low`, `high`, or `max` reasoning effort. The picker defaults to `max` on Kimi Platform and `high` on Kimi Code, matching each service's documentation. Kimi K2.7 Code and its High-Speed variant also cannot disable thinking.
+K3.1 Pro always thinks on both endpoints. Platform K3 and Platform K2.7 Code also always think. The picker never offers None for these models. K3.1 Pro and K3 default to `max` on Platform and `high` on Code; Code K2.8 Preview defaults to `max`. Code K2.7 High-Speed does not support adjustable reasoning effort.
+
+Start a new chat after switching models or reasoning effort, especially when moving to K3.1 Pro, as recommended by Kimi's documentation.
 
 ## Commands
 

@@ -1,5 +1,7 @@
 // src/presets.ts
 // Model registry and discovery merge logic for Kimi Copilot.
+// Verified 2026-10-26: https://platform.kimi.ai/docs/models
+// https://www.kimi.com/code/docs/en/kimi-code/models.html
 
 import type { KimiModel, KimiPreset } from "./types";
 import { KIMI_CODE_MODEL_ID } from "./endpoints";
@@ -7,22 +9,21 @@ import { KIMI_CODE_MODEL_ID } from "./endpoints";
 const K = 1024;
 const KIMI_CONTEXT = 256 * K;
 const KIMI_K3_CONTEXT = 1024 * K;
-const MOONSHOT_8K = 8 * K;
-const MOONSHOT_32K = 32 * K;
-const MOONSHOT_128K = 128 * K;
 const TOOL_LIMIT = 128;
 
 export type KimiModelCatalog = "platform" | "kimiCode" | "custom";
 
 export const KNOWN_KIMI_MODELS: KimiPreset[] = [
+  k31Model("kimi-k3.1-pro", "Kimi K3.1 Pro", "platform"),
+  k31Model("kimi-k3.1-pro-highspeed", "Kimi K3.1 Pro Highspeed", "platform"),
   {
     presetId: "kimi-k3",
     displayName: "Kimi K3",
     modelId: "kimi-k3",
     family: "kimi",
     version: "k3",
-    detail: "Flagship model with 1M context and vision",
-    tooltip: "Kimi's flagship model for software engineering, knowledge work, deep reasoning, and visual understanding.",
+    detail: "Previous flagship with 1M context and vision",
+    tooltip: "Kimi K3 for software engineering, knowledge work, deep reasoning, and visual understanding. K3.1 Pro is the latest flagship.",
     contextLength: KIMI_K3_CONTEXT,
     maxInputTokens: KIMI_K3_CONTEXT,
     maxOutputTokens: KIMI_K3_CONTEXT,
@@ -43,8 +44,8 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
     modelId: "kimi-k2.7-code",
     family: "kimi",
     version: "k2.7-code",
-    detail: "Code model, always-thinking",
-    tooltip: "Kimi's current code-focused model. Thinking and preserved thinking are always on.",
+    detail: "Retiring December 2026: always-thinking code model",
+    tooltip: "Kimi K2.7 Code always uses thinking and preserved thinking. Platform retirement is planned for the end of December 2026; migrate to K3.1 Pro.",
     contextLength: KIMI_CONTEXT,
     maxInputTokens: KIMI_CONTEXT,
     maxOutputTokens: KIMI_CONTEXT,
@@ -64,8 +65,8 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
     modelId: "kimi-k2.7-code-highspeed",
     family: "kimi",
     version: "k2.7-code-highspeed",
-    detail: "High-speed code model, always-thinking",
-    tooltip: "High-speed Kimi K2.7 Code variant for coding and agent tasks.",
+    detail: "Retiring December 2026: high-speed code model",
+    tooltip: "High-speed Kimi K2.7 Code for coding and agent tasks. Platform retirement is planned for the end of December 2026; migrate to K3.1 Pro Highspeed.",
     contextLength: KIMI_CONTEXT,
     maxInputTokens: KIMI_CONTEXT,
     maxOutputTokens: KIMI_CONTEXT,
@@ -85,8 +86,8 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
     modelId: "kimi-k2.6",
     family: "kimi",
     version: "k2.6",
-    detail: "General model with thinking and vision",
-    tooltip: "Kimi's general-purpose model for coding, agent tasks, text, image, and video input.",
+    detail: "Retiring December 2026: thinking and vision",
+    tooltip: "Kimi K2.6 for coding, agent tasks, text, image, and video input. Platform retirement is planned for the end of December 2026; migrate to K3.1 Pro.",
     contextLength: KIMI_CONTEXT,
     maxInputTokens: KIMI_CONTEXT,
     maxOutputTokens: KIMI_CONTEXT,
@@ -100,36 +101,11 @@ export const KNOWN_KIMI_MODELS: KimiPreset[] = [
       alwaysThinking: false,
     },
   },
-  {
-    presetId: "kimi-k2.5",
-    displayName: "Kimi K2.5",
-    modelId: "kimi-k2.5",
-    family: "kimi",
-    version: "k2.5",
-    detail: "General model with thinking and vision",
-    tooltip: "Previous Kimi K2 model with thinking support. Preserved thinking is not supported.",
-    contextLength: KIMI_CONTEXT,
-    maxInputTokens: KIMI_CONTEXT,
-    maxOutputTokens: KIMI_CONTEXT,
-    capabilities: {
-      toolCalling: TOOL_LIMIT,
-      imageInput: true,
-      thinking: true,
-      canDisableThinking: true,
-      supportsPreservedThinking: false,
-      supportsReasoningEffort: false,
-      alwaysThinking: false,
-    },
-  },
-  moonshotModel("moonshot-v1-8k", "Moonshot V1 8K", MOONSHOT_8K, false),
-  moonshotModel("moonshot-v1-32k", "Moonshot V1 32K", MOONSHOT_32K, false),
-  moonshotModel("moonshot-v1-128k", "Moonshot V1 128K", MOONSHOT_128K, false),
-  moonshotModel("moonshot-v1-8k-vision-preview", "Moonshot V1 8K Vision", MOONSHOT_8K, true),
-  moonshotModel("moonshot-v1-32k-vision-preview", "Moonshot V1 32K Vision", MOONSHOT_32K, true),
-  moonshotModel("moonshot-v1-128k-vision-preview", "Moonshot V1 128K Vision", MOONSHOT_128K, true),
 ];
 
 export const KIMI_CODE_MODELS: KimiPreset[] = [
+  k31Model("k3.1-pro", "Kimi K3.1 Pro", "kimiCode"),
+  k31Model("k3.1-pro-highspeed", "Kimi K3.1 Pro Highspeed", "kimiCode"),
   {
     presetId: "k3",
     displayName: "Kimi K3",
@@ -137,7 +113,7 @@ export const KIMI_CODE_MODELS: KimiPreset[] = [
     family: "kimi",
     version: "k3-code",
     detail: "Kimi Code K3 with up to 1M context",
-    tooltip: "Kimi K3 through the Kimi Code plan. Requires Moderato or above; 1M context requires Allegretto or above.",
+    tooltip: "Kimi K3 through the Kimi Code plan. Requires Plus / Moderato or above; 1M context requires Pro / Allegretto or above. Disabling thinking routes to K2.8 Preview.",
     contextLength: KIMI_K3_CONTEXT,
     maxInputTokens: KIMI_K3_CONTEXT,
     maxOutputTokens: KIMI_K3_CONTEXT,
@@ -145,10 +121,10 @@ export const KIMI_CODE_MODELS: KimiPreset[] = [
       toolCalling: TOOL_LIMIT,
       imageInput: true,
       thinking: true,
-      canDisableThinking: false,
+      canDisableThinking: true,
       supportsPreservedThinking: true,
       supportsReasoningEffort: true,
-      alwaysThinking: true,
+      alwaysThinking: false,
       defaultReasoningEffort: "high",
     },
   },
@@ -159,7 +135,7 @@ export const KIMI_CODE_MODELS: KimiPreset[] = [
     family: "kimi",
     version: "k3-256k-code",
     detail: "Kimi Code K3 with a fixed 256K context",
-    tooltip: "Kimi K3 256K through the Kimi Code plan. Requires Moderato or above and does not support video input.",
+    tooltip: "Kimi K3 256K through the Kimi Code plan. Requires Plus / Moderato or above and does not support video input. Disabling thinking routes to K2.8 Preview.",
     contextLength: KIMI_CONTEXT,
     maxInputTokens: KIMI_CONTEXT,
     maxOutputTokens: KIMI_CONTEXT,
@@ -167,32 +143,33 @@ export const KIMI_CODE_MODELS: KimiPreset[] = [
       toolCalling: TOOL_LIMIT,
       imageInput: true,
       thinking: true,
-      canDisableThinking: false,
+      canDisableThinking: true,
       supportsPreservedThinking: true,
       supportsReasoningEffort: true,
-      alwaysThinking: true,
+      alwaysThinking: false,
       defaultReasoningEffort: "high",
     },
   },
   {
     presetId: KIMI_CODE_MODEL_ID,
-    displayName: "Kimi K2.7 Code",
+    displayName: "Kimi K2.8 Preview",
     modelId: KIMI_CODE_MODEL_ID,
     family: "kimi",
-    version: "k2.7-code-plan",
-    detail: "Kimi Code standard-speed model",
-    tooltip: "Kimi K2.7 Code through the Kimi Code plan. Available to all membership tiers.",
-    contextLength: KIMI_CONTEXT,
-    maxInputTokens: KIMI_CONTEXT,
+    version: "k2.8-preview-code-plan",
+    detail: "Kimi Code K2.8 Preview with 1M context",
+    tooltip: "The kimi-for-coding alias now serves K2.8 Preview with low, high, or max reasoning effort. Requires Plus or above on new plans, or Andante or above on legacy plans.",
+    contextLength: KIMI_K3_CONTEXT,
+    maxInputTokens: KIMI_K3_CONTEXT,
     maxOutputTokens: 32 * K,
     capabilities: {
       toolCalling: TOOL_LIMIT,
       imageInput: true,
       thinking: true,
-      canDisableThinking: false,
+      canDisableThinking: true,
       supportsPreservedThinking: true,
-      supportsReasoningEffort: false,
-      alwaysThinking: true,
+      supportsReasoningEffort: true,
+      alwaysThinking: false,
+      defaultReasoningEffort: "max",
     },
   },
   {
@@ -202,7 +179,7 @@ export const KIMI_CODE_MODELS: KimiPreset[] = [
     family: "kimi",
     version: "k2.7-code-highspeed-plan",
     detail: "Kimi Code high-speed model",
-    tooltip: "High-speed Kimi K2.7 Code through the Kimi Code plan. Requires Allegretto or above.",
+    tooltip: "High-speed Kimi K2.7 Code through the Kimi Code plan. Requires Pro / Allegretto or above. Disabling thinking routes to K2.8 Preview.",
     contextLength: KIMI_CONTEXT,
     maxInputTokens: KIMI_CONTEXT,
     maxOutputTokens: 32 * K,
@@ -210,10 +187,10 @@ export const KIMI_CODE_MODELS: KimiPreset[] = [
       toolCalling: TOOL_LIMIT,
       imageInput: true,
       thinking: true,
-      canDisableThinking: false,
+      canDisableThinking: true,
       supportsPreservedThinking: true,
       supportsReasoningEffort: false,
-      alwaysThinking: true,
+      alwaysThinking: false,
     },
   },
 ];
@@ -226,16 +203,21 @@ export function mergeDiscoveredModels(
   const byId = new Map(bundled.map((model) => [model.modelId, model]));
 
   for (const model of discovered ?? []) {
-    if (!model.id || isDeprecatedModel(model.id)) {
+    if (
+      typeof model?.id !== "string" || !model.id.trim() ||
+      (catalog !== "custom" && isDeprecatedModel(model.id))
+    ) {
       continue;
     }
 
     const known = byId.get(model.id);
     if (known) {
+      const contextLength = validContextLength(model.context_length, known.contextLength);
       byId.set(model.id, {
         ...known,
-        contextLength: model.context_length ?? known.contextLength,
-        maxInputTokens: model.context_length ?? known.maxInputTokens,
+        contextLength,
+        maxInputTokens: contextLength,
+        maxOutputTokens: Math.min(known.maxOutputTokens, contextLength),
       });
       continue;
     }
@@ -256,28 +238,30 @@ export function supportsThinking(preset: KimiPreset): boolean {
   return preset.capabilities.thinking;
 }
 
-function moonshotModel(id: string, name: string, contextLength: number, vision: boolean): KimiPreset {
+function k31Model(id: string, name: string, catalog: KimiModelCatalog): KimiPreset {
+  const highspeed = id.endsWith("-highspeed");
   return {
     presetId: id,
     displayName: name,
     modelId: id,
-    family: "moonshot",
-    version: id.replace("moonshot-v1-", ""),
-    detail: vision ? "Text generation with image input" : "Text generation",
-    tooltip: vision
-      ? "Moonshot V1 vision model. Use for image understanding and text output."
-      : "Moonshot V1 text model. Use for straightforward generation tasks.",
-    contextLength,
-    maxInputTokens: contextLength,
-    maxOutputTokens: contextLength,
+    family: "kimi",
+    version: id.replace(/^kimi-/, ""),
+    detail: highspeed ? "High-speed flagship with 1M context and vision" : "Latest flagship with 1M context and vision",
+    tooltip: catalog === "platform"
+      ? `${name} with 1M context, vision, tools, and always-on reasoning.`
+      : `${name} through Kimi Code. ${highspeed ? "Requires Pro / Allegretto or above." : "Requires Plus / Moderato or above; 1M context requires Pro / Allegretto or above."} Thinking cannot be disabled.`,
+    contextLength: KIMI_K3_CONTEXT,
+    maxInputTokens: KIMI_K3_CONTEXT,
+    maxOutputTokens: KIMI_K3_CONTEXT,
     capabilities: {
-      toolCalling: false,
-      imageInput: vision,
-      thinking: false,
+      toolCalling: TOOL_LIMIT,
+      imageInput: true,
+      thinking: true,
       canDisableThinking: false,
-      supportsPreservedThinking: false,
-      supportsReasoningEffort: false,
-      alwaysThinking: false,
+      supportsPreservedThinking: true,
+      supportsReasoningEffort: true,
+      alwaysThinking: true,
+      defaultReasoningEffort: catalog === "platform" ? "max" : "high",
     },
   };
 }
@@ -294,11 +278,14 @@ function bundledModels(catalog: KimiModelCatalog): KimiPreset[] {
 
 function presetFromUnknownModel(model: KimiModel, catalog: KimiModelCatalog): KimiPreset {
   const id = model.id;
-  const contextLength = model.context_length ?? KIMI_CONTEXT;
-  const isK3 = /^(?:kimi-)?k3(?:$|-)/i.test(id);
-  const isK27Code = /k2\.7-code|kimi-for-coding/i.test(id);
-  const reasoning = Boolean(model.supports_reasoning) || /k[23]|thinking|reason/i.test(id);
-  const imageInput = Boolean(model.supports_image_in || model.supports_video_in || /vision|k[23]/i.test(id));
+  const contextLength = validContextLength(model.context_length, KIMI_CONTEXT);
+  const isK3 = /^(?:kimi-)?k3(?:$|[.-])/i.test(id);
+  const isK31 = /^(?:kimi-)?k3\.1(?:$|-)/i.test(id);
+  const isK27Code = /k2\.7-code|kimi-for-coding-highspeed/i.test(id);
+  const isK28 = id === KIMI_CODE_MODEL_ID;
+  const reasoning = model.supports_reasoning ?? /k[23]|thinking|reason/i.test(id);
+  const imageInput = (model.supports_image_in ?? /vision|k2\.[5-9]|k3/i.test(id)) || model.supports_video_in === true;
+  const canDisableThinking = reasoning && !isK31 && (catalog === "kimiCode" || (!isK3 && !isK27Code));
 
   return {
     presetId: id,
@@ -315,11 +302,12 @@ function presetFromUnknownModel(model: KimiModel, catalog: KimiModelCatalog): Ki
       toolCalling: reasoning ? TOOL_LIMIT : false,
       imageInput,
       thinking: reasoning,
-      canDisableThinking: reasoning && !isK27Code && !isK3,
-      supportsPreservedThinking: /k2\.6|k2\.7-code/i.test(id) || isK3,
-      supportsReasoningEffort: isK3,
-      alwaysThinking: isK27Code || isK3,
-      defaultReasoningEffort: isK3 ? (catalog === "platform" ? "max" : "high") : undefined,
+      canDisableThinking,
+      supportsPreservedThinking: reasoning && (/k2\.6|k2\.7-code/i.test(id) || isK3 || isK28),
+      supportsReasoningEffort: reasoning && (isK3 || isK28),
+      alwaysThinking: reasoning && !canDisableThinking,
+      defaultReasoningEffort: reasoning && (isK3 || isK28)
+        ? (catalog === "platform" || isK28 ? "max" : "high") : undefined,
     },
   };
 }
@@ -332,18 +320,27 @@ function modelLabel(id: string): string {
     .join(" ");
 }
 
+function validContextLength(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+
 function isDeprecatedModel(id: string): boolean {
   return (
     id === "kimi-latest" ||
     id === "kimi-thinking-preview" ||
+    id === "kimi-k2" ||
     id.startsWith("kimi-k2-") ||
-    id === "kimi-k2-thinking" ||
-    id === "kimi-k2-thinking-turbo"
+    id === "kimi-k2.5" ||
+    id.startsWith("moonshot-v1-")
   );
 }
 
 function sortRank(model: KimiPreset): number {
   const order = [
+    "kimi-k3.1-pro",
+    "k3.1-pro",
+    "kimi-k3.1-pro-highspeed",
+    "k3.1-pro-highspeed",
     "kimi-k3",
     "k3",
     "k3-256k",
@@ -352,13 +349,6 @@ function sortRank(model: KimiPreset): number {
     "kimi-k2.7-code-highspeed",
     "kimi-for-coding-highspeed",
     "kimi-k2.6",
-    "kimi-k2.5",
-    "moonshot-v1-128k-vision-preview",
-    "moonshot-v1-32k-vision-preview",
-    "moonshot-v1-8k-vision-preview",
-    "moonshot-v1-128k",
-    "moonshot-v1-32k",
-    "moonshot-v1-8k",
   ];
   const index = order.indexOf(model.modelId);
   return index === -1 ? order.length : index;

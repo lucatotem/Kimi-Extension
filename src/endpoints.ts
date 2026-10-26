@@ -11,7 +11,7 @@ export function normalizeBaseUrl(baseUrl: string): string {
 
   try {
     const url = new URL(trimmed);
-    if (url.hostname.toLowerCase() === "api.kimi.com" && trimPath(url.pathname) === "/coding") {
+    if (isKimiCodeHost(url.hostname) && trimPath(url.pathname) === "/coding") {
       url.pathname = "/coding/v1";
       return url.toString().replace(/\/+$/, "");
     }
@@ -27,12 +27,24 @@ export function isKimiCodeBaseUrl(baseUrl: string): boolean {
 
   try {
     const url = new URL(normalized);
-    return url.hostname.toLowerCase() === "api.kimi.com" && trimPath(url.pathname).startsWith(
-      "/coding",
-    );
+    return isKimiCodeHost(url.hostname) && trimPath(url.pathname) === "/coding/v1";
   } catch {
-    return normalized.toLowerCase().includes("api.kimi.com/coding");
+    return false;
   }
+}
+
+export function isKimiPlatformBaseUrl(baseUrl: string): boolean {
+  try {
+    const url = new URL(normalizeBaseUrl(baseUrl));
+    return ["api.moonshot.ai", "api.moonshot.cn"].includes(url.hostname.toLowerCase()) &&
+      trimPath(url.pathname) === "/v1";
+  } catch {
+    return false;
+  }
+}
+
+function isKimiCodeHost(hostname: string): boolean {
+  return ["api.kimi.com", "api.kimi.ai"].includes(hostname.toLowerCase());
 }
 
 function trimPath(pathname: string): string {
